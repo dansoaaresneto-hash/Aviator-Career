@@ -1,0 +1,377 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { SimTelemetryData, MissionValidationResult, ValidationItem, ValidationStatus } from '../types/telemetry';
+import { Contract } from '../types';
+
+interface TelemetryContextType {
+  telemetry: SimTelemetryData;
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'simulated';
+  userToken: string;
+  showConnectorModal: boolean;
+  setShowConnectorModal: (show: boolean) => void;
+  regenerateToken: () => void;
+  updateTelemetry: (data: Partial<SimTelemetryData>) => void;
+  startVirtualSimulation: (preset?: { airport?: string; aircraft?: string; payloadKg?: number }) => void;
+  stopVirtualSimulation: () => void;
+  validateContract: (contract: Contract | null) => MissionValidationResult;
+  isPolling: boolean;
+  setIsPolling: (polling: boolean) => void;
+}
+
+const DEFAULT_TOKEN = () => {
+  const saved = localStorage.getItem('aviator_sim_token');
+  if (saved) return saved;
+  const newToken = 'AV-' + Math.floor(100000 + Math.random() * 900000);
+  localStorage.setItem('aviator_sim_token', newToken);
+  return newToken;
+};
+
+const INITIAL_TELEMETRY: SimTelemetryData = {
+  token: '',
+  connected: false,
+  simName: 'Desconectado',
+  airportIcao: '---',
+  airportName: 'Aguardando Simulador',
+  aircraftTitle: 'Nenhuma Aeronave Detectada',
+  aircraftCategory: 'Geral',
+  totalWeightKg: 0,
+  payloadKg: 0,
+  fuelKg: 0,
+  latitude: 0,
+  longitude: 0,
+  altitudeFt: 0,
+  groundSpeedKts: 0,
+  onGround: true,
+  lastUpdated: new Date().toISOString(),
+  isSimulated: false,
+};
+
+const TelemetryContext = createContext<TelemetryContextType | undefined>(undefined);
+
+export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [userToken, setUserToken] = useState<string>(DEFAULT_TOKEN);
+  const [showConnectorModal, setShowConnectorModal] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'simulated'>('disconnected');
+  const [isPolling, setIsPolling] = useState<boolean>(true);
+
+  const [telemetry, setTelemetry] = useState<SimTelemetryData>(() => ({
+    ...INITIAL_TELEMETRY,
+    token: userToken,
+  }));
+
+  const regenerateToken = () => {
+    const newToken = 'AV-' + Math.floor(100000 + Math.random() * 900000);
+    setUserToken(newToken);
+    localStorage.setItem('aviator_sim_token', newToken);
+  };
+
+  const updateTelemetry = useCallback((data: Partial<SimTelemetryData>) => {
+    setTelemetry((prev) => {
+      const updated = {
+        ...prev,
+        ...data,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      if (updated.isSimulated) {
+        setConnectionStatus('simulated');
+      } else if (updated.connected) {
+        setConnectionStatus('connected');
+      } else {
+        setConnectionStatus('disconnected');
+      }
+
+      return updated;
+    });
+  }, []);
+
+  // Poll server for telemetry pushed by local connector python script
+  useEffect(() => {
+    if (!isPolling || connectionStatus === 'simulated') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/telemetry?token=${encodeURIComponent(userToken)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'success' && json.data) {
+            const data = json.data;
+            const isFresh = new Date().getTime() - new Date(data.lastUpdated).getTime() < 12000;
+            if (isFresh && data.connected) {
+              setTelemetry({ ...data, isSimulated: false });
+              setConnectionStatus('connected');
+            } else {
+              if (connectionStatus === 'connected') {
+                setConnectionStatus('disconnected');
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Silent error handling for background polling
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [userToken, isPolling, connectionStatus]);
+
+  // Virtual Simulator Preset for testing in-browser
+  const startVirtualSimulation = (preset?: { airport?: string; aircraft?: string; payloadKg?: number }) => {
+    const simData: SimTelemetryData = {
+      token: userToken,
+      connected: true,
+      simName: 'MSFS 2020 (Simulador Virtual)',
+      airportIcao: preset?.airport || 'SBGR',
+      airportName: 'Aeroporto Internacional de Guarulhos',
+      aircraftTitle: preset?.aircraft || 'Cessna 172 Skyhawk G1000',
+      aircraftCategory: 'Monomotor a Pistão',
+      totalWeightKg: 1111,
+      payloadKg: preset?.payloadKg || 380,
+      fuelKg: 140,
+      latitude: -23.4356,
+      longitude: -46.4731,
+      altitudeFt: 2450,
+      groundSpeedKts: 0,
+      onGround: true,
+      lastUpdated: new Date().toISOString(),
+      isSimulated: true,
+    };
+
+    setTelemetry(simData);
+    setConnectionStatus('simulated');
+  };
+
+  const stopVirtualSimulation = () => {
+    setTelemetry({
+      ...INITIAL_TELEMETRY,
+      token: userToken,
+    });
+    setConnectionStatus('disconnected');
+  };
+
+  // Mission validation algorithm
+  const validateContract = useCallback(
+    (contract: Contract | null): MissionValidationResult => {
+      if (!contract) {
+        return {
+          overallStatus: 'pending',
+          canDepart: false,
+          summaryText: 'Nenhum contrato ativo no momento.',
+          airportCheck: {
+            key: 'airport',
+            title: 'Aeroporto de Origem',
+            status: 'pending',
+            currentValue: telemetry.airportIcao || '---',
+            requiredValue: '---',
+            message: 'Nenhum voo selecionado.',
+          },
+          aircraftCheck: {
+            key: 'aircraft',
+            title: 'Modelo da Aeronave',
+            status: 'pending',
+            currentValue: telemetry.aircraftTitle || '---',
+            requiredValue: '---',
+            message: 'Nenhum voo selecionado.',
+          },
+          weightCheck: {
+            key: 'weight',
+            title: 'Peso e Carga Útil',
+            status: 'pending',
+            currentValue: `${telemetry.payloadKg} kg`,
+            requiredValue: '---',
+            message: 'Nenhum voo selecionado.',
+          },
+        };
+      }
+
+      if (connectionStatus === 'disconnected' && !telemetry.connected) {
+        return {
+          overallStatus: 'pending',
+          canDepart: false,
+          summaryText: 'Conecte o MSFS via conector do Aviator para validar seu voo.',
+          airportCheck: {
+            key: 'airport',
+            title: 'Aeroporto de Origem',
+            status: 'pending',
+            currentValue: 'Aguardando MSFS',
+            requiredValue: `${contract.route.departureIcao} (${contract.route.departureCity})`,
+            message: 'Aguardando conexão com o simulador.',
+          },
+          aircraftCheck: {
+            key: 'aircraft',
+            title: 'Modelo da Aeronave',
+            status: 'pending',
+            currentValue: 'Aguardando MSFS',
+            requiredValue: contract.requiredAircraft,
+            message: 'Aguardando leitura da aeronave no simulador.',
+          },
+          weightCheck: {
+            key: 'weight',
+            title: 'Peso e Carga Útil',
+            status: 'pending',
+            currentValue: 'Aguardando MSFS',
+            requiredValue: contract.payloadInfo,
+            message: 'Aguardando leitura de peso no simulador.',
+          },
+        };
+      }
+
+      // 1. Airport Validation
+      const currentAirport = (telemetry.airportIcao || '').trim().toUpperCase();
+      const requiredAirport = (contract.route.departureIcao || '').trim().toUpperCase();
+
+      let airportStatus: ValidationStatus = 'invalid';
+      let airportMsg = '';
+
+      if (currentAirport === requiredAirport) {
+        airportStatus = 'valid';
+        airportMsg = `Localização confirmada no aeroporto de partida ${requiredAirport}.`;
+      } else {
+        airportStatus = 'invalid';
+        airportMsg = `Você está posicionado em "${currentAirport || 'Desconhecido'}", porém a missão exige partida em "${requiredAirport}" (${contract.route.departureCity}). Mova a aeronave para ${requiredAirport}.`;
+      }
+
+      // 2. Aircraft Validation
+      const currentAircraft = (telemetry.aircraftTitle || '').toLowerCase();
+      const reqAircraft = (contract.requiredAircraft || '').toLowerCase();
+      const reqCategory = (contract.aircraftCategory || '').toLowerCase();
+
+      let aircraftStatus: ValidationStatus = 'invalid';
+      let aircraftMsg = '';
+
+      // Check direct name match or keywords
+      const reqKeywords = reqAircraft.split(' ').filter((w) => w.length > 2);
+      const isDirectMatch =
+        currentAircraft.includes(reqAircraft) ||
+        reqAircraft.includes(currentAircraft) ||
+        reqKeywords.some((kw) => currentAircraft.includes(kw));
+
+      const isCategoryMatch =
+        reqCategory.includes('qualquer') ||
+        reqCategory.includes('frota') ||
+        (reqCategory.includes('monomotor') && (currentAircraft.includes('172') || currentAircraft.includes('cessna') || currentAircraft.includes('piper') || currentAircraft.includes('bonanza'))) ||
+        (reqCategory.includes('bimotor') && (currentAircraft.includes('baron') || currentAircraft.includes('king') || currentAircraft.includes('seneca') || currentAircraft.includes('twin')));
+
+      if (isDirectMatch) {
+        aircraftStatus = 'valid';
+        aircraftMsg = `Aeronave exata validada no simulador (${telemetry.aircraftTitle}).`;
+      } else if (isCategoryMatch) {
+        aircraftStatus = 'warning';
+        aircraftMsg = `Aeronave (${telemetry.aircraftTitle}) é compatível com a categoria contratada (${contract.aircraftCategory}).`;
+      } else {
+        aircraftStatus = 'invalid';
+        aircraftMsg = `Aeronave em uso no MSFS (${telemetry.aircraftTitle}) diverge do contrato (${contract.requiredAircraft}).`;
+      }
+
+      // 3. Weight & Payload Validation
+      let expectedPayloadKg = 0;
+      const numMatch = contract.payloadInfo.match(/(\d+)\s*kg/i);
+      if (numMatch) {
+        expectedPayloadKg = parseInt(numMatch[1], 10);
+      } else if (contract.payloadInfo.toLowerCase().includes('executivo') || contract.payloadInfo.toLowerCase().includes('pax') || contract.payloadInfo.toLowerCase().includes('passageiro')) {
+        const paxMatch = contract.payloadInfo.match(/(\d+)/);
+        const paxCount = paxMatch ? parseInt(paxMatch[1], 10) : 2;
+        expectedPayloadKg = paxCount * 80; // 80kg per passenger average
+      } else {
+        expectedPayloadKg = 250; // default fallback
+      }
+
+      let weightStatus: ValidationStatus = 'invalid';
+      let weightMsg = '';
+      const actualPayload = telemetry.payloadKg || 0;
+      const diffKg = Math.abs(actualPayload - expectedPayloadKg);
+
+      if (actualPayload === 0 && expectedPayloadKg > 0) {
+        weightStatus = 'invalid';
+        weightMsg = `A aeronave está sem carga/passageiros no MSFS. Adicione ~${expectedPayloadKg} kg no menu do simulador.`;
+      } else if (diffKg <= 80) {
+        weightStatus = 'valid';
+        weightMsg = `Carga e passageiros validados (${actualPayload} kg vs ~${expectedPayloadKg} kg exigidos).`;
+      } else if (diffKg <= 200) {
+        weightStatus = 'warning';
+        weightMsg = `Peso no MSFS (${actualPayload} kg) possui variação aceitável em relação à missão (~${expectedPayloadKg} kg).`;
+      } else {
+        weightStatus = 'invalid';
+        weightMsg = `Divergência de peso no MSFS (${actualPayload} kg no MSFS vs ~${expectedPayloadKg} kg contratados). Ajuste o peso antes de decolar.`;
+      }
+
+      // Overall resolution
+      const isAllValid = airportStatus === 'valid' && (aircraftStatus === 'valid' || aircraftStatus === 'warning') && (weightStatus === 'valid' || weightStatus === 'warning');
+
+      const isAnyInvalid = airportStatus === 'invalid' || aircraftStatus === 'invalid' || weightStatus === 'invalid';
+
+      let overallStatus: 'approved' | 'warning' | 'rejected' | 'pending' = 'rejected';
+      let canDepart = false;
+      let summaryText = '';
+
+      if (isAllValid) {
+        overallStatus = aircraftStatus === 'warning' || weightStatus === 'warning' ? 'warning' : 'approved';
+        canDepart = true;
+        summaryText = '🟢 Voo validado com sucesso! Sua aeronave e aeroporto correspondem à missão.';
+      } else if (isAnyInvalid) {
+        overallStatus = 'rejected';
+        canDepart = false;
+        summaryText = '🔴 O voo não pode ser iniciado ainda. Corrija as inconsistências indicadas abaixo.';
+      }
+
+      return {
+        overallStatus,
+        canDepart,
+        summaryText,
+        airportCheck: {
+          key: 'airport',
+          title: 'Aeroporto de Origem',
+          status: airportStatus,
+          currentValue: currentAirport || 'Indefinido',
+          requiredValue: `${contract.route.departureIcao} (${contract.route.departureCity})`,
+          message: airportMsg,
+        },
+        aircraftCheck: {
+          key: 'aircraft',
+          title: 'Modelo da Aeronave',
+          status: aircraftStatus,
+          currentValue: telemetry.aircraftTitle || 'Indefinido',
+          requiredValue: contract.requiredAircraft,
+          message: aircraftMsg,
+        },
+        weightCheck: {
+          key: 'weight',
+          title: 'Peso e Carga Útil',
+          status: weightStatus,
+          currentValue: `${telemetry.payloadKg} kg (Total: ${telemetry.totalWeightKg} kg)`,
+          requiredValue: `~${expectedPayloadKg} kg (${contract.payloadInfo})`,
+          message: weightMsg,
+        },
+      };
+    },
+    [telemetry, connectionStatus]
+  );
+
+  return (
+    <TelemetryContext.Provider
+      value={{
+        telemetry,
+        connectionStatus,
+        userToken,
+        showConnectorModal,
+        setShowConnectorModal,
+        regenerateToken,
+        updateTelemetry,
+        startVirtualSimulation,
+        stopVirtualSimulation,
+        validateContract,
+        isPolling,
+        setIsPolling,
+      }}
+    >
+      {children}
+    </TelemetryContext.Provider>
+  );
+};
+
+export const useTelemetry = () => {
+  const context = useContext(TelemetryContext);
+  if (!context) {
+    throw new Error('useTelemetry must be used within a TelemetryProvider');
+  }
+  return context;
+};
