@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 
 const AIRAC_API_BASE = 'https://airac.net/api/v1';
 const AIRAC_USER_AGENT = 'AviatorMSFSFlightPlanner/1.0 (https://ai.studio; flightplanner@aviator-msfs.app)';
@@ -461,6 +460,10 @@ pause
 
 async function start() {
   if (process.env.NODE_ENV !== 'production') {
+    // Import dinâmico: só carrega o pacote 'vite' (ESM-only, dev-only) quando
+    // realmente vamos rodar o servidor de desenvolvimento local. Isso evita que
+    // o Vercel tente empacotar/carregar o 'vite' dentro da função serverless.
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
