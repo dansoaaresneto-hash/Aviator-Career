@@ -222,24 +222,39 @@ app.get('/api/metar/:icao', async (req, res) => {
 const telemetryStore = new Map<string, any>();
 
 // POST /api/telemetry - Receive telemetry from local Python connector script
-app.post('/api/telemetry', (req, res) => {
+app.post('/api/telemetry', async (req, res) => {
   const { token, airportIcao, aircraftTitle, totalWeightKg, payloadKg, fuelKg, latitude, longitude, altitudeFt, groundSpeedKts, onGround, simName } = req.body;
 
   if (!token) {
     return res.status(400).json({ status: 'error', message: 'Token de conexão obrigatório' });
   }
 
+  const latNum = Number(latitude) || -23.4356;
+  const lonNum = Number(longitude) || -46.4731;
+
+  let calculatedIcao = (airportIcao || 'SBGR').toUpperCase();
+
+  try {
+    const nearby = await proxyAirac(`/airports/nearby?latitude=${latNum}&longitude=${lonNum}&radius=50`);
+    if (nearby && nearby.status === 'success' && Array.isArray(nearby.data) && nearby.data.length > 0) {
+      const nearest = nearby.data[0];
+      calculatedIcao = (nearest.identifier || nearest.icao || calculatedIcao).toUpperCase();
+    }
+  } catch (err) {
+    console.warn('Erro ao calcular aeroporto mais próximo via AIRAC:', err);
+  }
+
   const telemetryData = {
     token,
     connected: true,
     simName: simName || 'Microsoft Flight Simulator 2020',
-    airportIcao: (airportIcao || 'SBGR').toUpperCase(),
+    airportIcao: calculatedIcao,
     aircraftTitle: aircraftTitle || 'Cessna 172 Skyhawk',
     totalWeightKg: Number(totalWeightKg) || 1050,
     payloadKg: Number(payloadKg) || 300,
     fuelKg: Number(fuelKg) || 120,
-    latitude: Number(latitude) || -23.4356,
-    longitude: Number(longitude) || -46.4731,
+    latitude: latNum,
+    longitude: lonNum,
     altitudeFt: Number(altitudeFt) || 2450,
     groundSpeedKts: Number(groundSpeedKts) || 0,
     onGround: Boolean(onGround),

@@ -46,6 +46,10 @@ export const ConnectorView: React.FC = () => {
     setTimeout(() => setCopiedToken(false), 2000);
   };
 
+  const handleDownloadExe = () => {
+    window.location.href = '/downloads/AviatorConnector.exe';
+  };
+
   const handleDownloadBat = () => {
     window.location.href = `/api/connector/bat?token=${encodeURIComponent(userToken)}`;
   };
@@ -208,52 +212,77 @@ export const ConnectorView: React.FC = () => {
               <ShieldCheck className="w-6 h-6 text-emerald-600" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Option 1: BAT Launcher */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Option 1: Executable EXE */}
               <div className="bg-slate-900 text-white rounded-xl p-5 border border-slate-800 flex flex-col justify-between space-y-4 shadow-sm">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
-                      Recomendado
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-sky-400 bg-sky-950 px-2 py-0.5 rounded border border-sky-800">
+                      Executável Direto
                     </span>
-                    <Terminal className="w-5 h-5 text-emerald-400" />
+                    <Laptop className="w-5 h-5 text-sky-400" />
                   </div>
-                  <h4 className="font-bold text-sm">Iniciar_Conector.bat</h4>
+                  <h4 className="font-bold text-sm">AviatorConnector.exe</h4>
                   <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Instalador e iniciador automático para Windows. Instala as bibliotecas do SimConnect e conecta com duplo clique.
+                    Executável nativo sem necessidade de instalar o Python. Dê duplo clique e cole seu Token PIN.
+                  </p>
+                </div>
+
+                <a
+                  href="/downloads/AviatorConnector.exe"
+                  download
+                  className="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm text-center"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar AviatorConnector.exe</span>
+                </a>
+              </div>
+
+              {/* Option 2: BAT Launcher */}
+              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 flex flex-col justify-between space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                      Script Windows
+                    </span>
+                    <Terminal className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <h4 className="font-bold text-sm text-slate-800">Iniciar_Conector.bat</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Instalador e iniciador automático para Windows. Instala bibliotecas do SimConnect e conecta.
                   </p>
                 </div>
 
                 <button
                   onClick={handleDownloadBat}
-                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Baixar Iniciar_Conector.bat</span>
+                  <span>Baixar .bat</span>
                 </button>
               </div>
 
-              {/* Option 2: PY Script */}
+              {/* Option 3: PY Script */}
               <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 flex flex-col justify-between space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
-                      Código Fonte Python
+                      Código Python
                     </span>
                     <FileCode className="w-5 h-5 text-sky-600" />
                   </div>
                   <h4 className="font-bold text-sm text-slate-800">AviatorConnector.py</h4>
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Script Python customizado com seu Token ({userToken}) para quem já possui Python 3 e SimConnect instalados.
+                    Script Python customizado com seu Token ({userToken}) para quem já possui Python 3.
                   </p>
                 </div>
 
                 <button
                   onClick={handleDownloadScript}
-                  className="w-full bg-slate-900 hover:bg-sky-600 text-white font-bold text-xs py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Baixar AviatorConnector.py</span>
+                  <span>Baixar .py</span>
                 </button>
               </div>
             </div>
