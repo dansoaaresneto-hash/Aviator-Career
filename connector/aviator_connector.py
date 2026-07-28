@@ -8,7 +8,7 @@ import sys
 import requests
 
 # >>> TROQUE ISSO pela URL real do seu app no Vercel <<<
-SERVER_URL = "https://SEU-APP.vercel.app/api/telemetry"
+SERVER_URL = "https://aviator-career.vercel.app/api/telemetry"
 
 # Guarda o token do usuario ao lado do .exe, para nao pedir de novo toda vez
 BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
