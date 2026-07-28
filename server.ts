@@ -479,4 +479,12 @@ async function start() {
   });
 }
 
-start();
+// No Vercel, este arquivo é apenas importado (via api/index.ts) para virar uma
+// função serverless — o Vercel cuida de servir o front-end estático separadamente.
+// Só chamamos start() (que liga o servidor Express tradicional) quando NÃO
+// estivermos rodando dentro do Vercel, ou seja: localmente ou no AI Studio.
+if (!process.env.VERCEL) {
+  start();
+}
+
+export default app;
