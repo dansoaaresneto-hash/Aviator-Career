@@ -27,13 +27,19 @@ jobs:
         run: |
           pyinstaller --onefile --console --name AviatorConnector connector/aviator_connector.py
 
-      - name: Publish as GitHub Release (rolling)
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: connector-latest
-          name: "Aviator Connector - build automatico"
-          body: "Gerado automaticamente pelo GitHub Actions a cada atualizacao do conector."
-          files: dist/AviatorConnector.exe
-          make_latest: true
+      - name: Copy EXE into the app's public folder
+        run: |
+          mkdir -p public/downloads
+          copy dist\AviatorConnector.exe public\downloads\AviatorConnector.exe
+        shell: cmd
+
+      - name: Commit and push the updated EXE
+        run: |
+          git config user.name "aviator-bot"
+          git config user.email "actions@github.com"
+          git add public/downloads/AviatorConnector.exe
+          git commit -m "chore: atualiza AviatorConnector.exe [skip ci]" || echo "Nada para commitar"
+          git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
