@@ -28,7 +28,7 @@ jobs:
 
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onefile --console --name AviatorConnector connector/aviator_connector.py
+          pyinstaller --onefile --console --name AviatorConnector --collect-all SimConnect connector/aviator_connector.py
 
       - name: Copy EXE into the app's public folder
         shell: bash
