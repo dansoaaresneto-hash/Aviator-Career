@@ -4,8 +4,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // CHAVES DE CONEXÃO COM O SUPABASE (EDITE DIRETAMENTE AQUI)
 // Insira a URL e a Chave Anônima do seu projeto Supabase:
 // =========================================================================
-export const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://sua-url-do-projeto.supabase.co';
-export const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'sua-chave-anonima-aqui';
+export const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://vaqnidpnmjmkhhepyyyi.supabase.co';
+export const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhcW5pZHBubWpta2hoZXB5eXlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjg1NTIsImV4cCI6MjEwMDg0NDU1Mn0.f8n9A9VtrrYou0bz_AkRqkOpYnzpdhL8nOF-kTEY8a8';
 
 // Verifica se as chaves foram preenchidas no código ou via arquivo .env
 export const isSupabaseConfigured = Boolean(
