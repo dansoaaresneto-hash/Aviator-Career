@@ -1,0 +1,39 @@
+name: Build Aviator Connector EXE
+
+on:
+  push:
+    paths:
+      - 'connector/aviator_connector.py'
+      - '.github/workflows/build-connector.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller requests SimConnect
+
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller --onefile --console --name AviatorConnector connector/aviator_connector.py
+
+      - name: Publish as GitHub Release (rolling)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: connector-latest
+          name: "Aviator Connector - build automatico"
+          body: "Gerado automaticamente pelo GitHub Actions a cada atualizacao do conector."
+          files: dist/AviatorConnector.exe
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
