@@ -1,5 +1,8 @@
 name: Build Aviator Connector EXE
 
+permissions:
+  contents: write
+
 on:
   push:
     paths:
@@ -28,12 +31,13 @@ jobs:
           pyinstaller --onefile --console --name AviatorConnector connector/aviator_connector.py
 
       - name: Copy EXE into the app's public folder
+        shell: bash
         run: |
           mkdir -p public/downloads
-          copy dist\AviatorConnector.exe public\downloads\AviatorConnector.exe
-        shell: cmd
+          cp dist/AviatorConnector.exe public/downloads/AviatorConnector.exe
 
       - name: Commit and push the updated EXE
+        shell: bash
         run: |
           git config user.name "aviator-bot"
           git config user.email "actions@github.com"
@@ -42,4 +46,5 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
