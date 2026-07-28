@@ -1,22 +1,18 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { AuthModal } from './AuthModal';
-import { SupabaseConfigModal } from './SupabaseConfigModal';
 import {
   User as UserIcon,
   LogOut,
   LogIn,
-  Shield,
-  Database,
   ChevronDown,
-  Sparkles,
+  Database,
   Plane
 } from 'lucide-react';
 
 export const UserMenu: React.FC = () => {
   const { user, signOut, isSupabaseConfigured } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   if (!user) {
@@ -75,23 +71,12 @@ export const UserMenu: React.FC = () => {
             </span>
           </div>
 
-          <button
-            onClick={() => {
-              setDropdownOpen(false);
-              setShowSupabaseModal(true);
-            }}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors text-left font-medium cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-emerald-600" />
-              <span>Conexão Supabase</span>
-            </div>
-            {isSupabaseConfigured ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            ) : (
-              <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-bold">Aviso</span>
-            )}
-          </button>
+          <div className="px-3 py-2 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-800 flex items-center gap-2">
+            <Database className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span className="truncate">
+              {isSupabaseConfigured ? 'Supabase Conectado' : 'Supabase (Código)'}
+            </span>
+          </div>
 
           <button
             onClick={() => {
@@ -120,7 +105,6 @@ export const UserMenu: React.FC = () => {
       )}
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      <SupabaseConfigModal isOpen={showSupabaseModal} onClose={() => setShowSupabaseModal(false)} />
     </div>
   );
 };

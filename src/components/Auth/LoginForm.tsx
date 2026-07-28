@@ -7,19 +7,17 @@ import {
   User as UserIcon,
   Radio,
   ArrowRight,
-  Database,
   Sparkles,
   AlertCircle,
-  CheckCircle2,
-  KeyRound
+  Database,
+  CheckCircle2
 } from 'lucide-react';
 
 interface LoginFormProps {
   onSuccess?: () => void;
-  onOpenSupabaseConfig?: () => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onOpenSupabaseConfig }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const { signIn, signUp, signInAsDemo, isSupabaseConfigured } = useAuth();
 
   const [isRegister, setIsRegister] = useState(false);
@@ -74,25 +72,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onOpenSupabaseC
           {isRegister ? 'Cadastro de Novo Piloto' : 'Acesso ao Aviator Career'}
         </h2>
         <p className="text-xs text-slate-300 mt-1">
-          {isRegister ? 'Crie sua conta de comandante para salvar seus voos' : 'Faça login com sua conta para conectar ao simulador'}
+          {isRegister ? 'Crie sua conta de comandante para salvar seus voos' : 'Faça login com sua conta de piloto para acessar o sistema'}
         </p>
 
-        {/* Database Status Tag */}
+        {/* Database Status Badge */}
         <div className="mt-3 flex items-center justify-center gap-2 text-[10px]">
           {isSupabaseConfigured ? (
             <span className="inline-flex items-center gap-1 font-bold text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-800">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Supabase Autenticação Conectado
+              Autenticação via Supabase Ativa
             </span>
           ) : (
-            <button
-              type="button"
-              onClick={onOpenSupabaseConfig}
-              className="inline-flex items-center gap-1 font-bold text-amber-300 bg-amber-950/80 hover:bg-amber-900 px-2.5 py-0.5 rounded-full border border-amber-800 transition-all cursor-pointer"
-            >
-              <Database className="w-3 h-3 text-amber-400" />
-              Conectar Supabase (Modo Teste)
-            </button>
+            <span className="inline-flex items-center gap-1 font-bold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
+              <Database className="w-3 h-3 text-sky-400" />
+              Chaves ativas em <code className="font-mono text-sky-300">src/lib/supabase.ts</code>
+            </span>
           )}
         </div>
       </div>
@@ -192,13 +186,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onOpenSupabaseC
           <button
             type="button"
             onClick={handleDemoLogin}
-            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Entrar no Modo Teste (Sem Cadastro)</span>
+            <span>Entrar com Conta de Demonstração</span>
           </button>
 
-          <div className="flex items-center justify-between text-xs pt-2">
+          <div className="flex items-center justify-center text-xs pt-2">
             <button
               type="button"
               onClick={() => {
@@ -207,19 +201,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onOpenSupabaseC
               }}
               className="text-sky-600 hover:text-sky-700 font-bold cursor-pointer"
             >
-              {isRegister ? 'Já possui uma conta? Faça Login' : 'Criar nova conta de piloto'}
+              {isRegister ? 'Já possui uma conta? Faça Login' : 'Não tem conta? Criar nova conta de piloto'}
             </button>
-
-            {onOpenSupabaseConfig && (
-              <button
-                type="button"
-                onClick={onOpenSupabaseConfig}
-                className="text-slate-500 hover:text-slate-800 font-semibold cursor-pointer flex items-center gap-1"
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>Chaves Supabase</span>
-              </button>
-            )}
           </div>
         </div>
       </form>

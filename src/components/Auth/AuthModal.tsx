@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { LoginForm } from './LoginForm';
-import { SupabaseConfigModal } from './SupabaseConfigModal';
 import { X } from 'lucide-react';
 
 interface AuthModalProps {
@@ -9,8 +8,6 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const [showConfig, setShowConfig] = useState(false);
-
   if (!isOpen) return null;
 
   return (
@@ -23,9 +20,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <X className="w-6 h-6" />
         </button>
 
-        <LoginForm onSuccess={onClose} onOpenSupabaseConfig={() => setShowConfig(true)} />
-
-        <SupabaseConfigModal isOpen={showConfig} onClose={() => setShowConfig(false)} />
+        <LoginForm onSuccess={onClose} />
       </div>
     </div>
   );

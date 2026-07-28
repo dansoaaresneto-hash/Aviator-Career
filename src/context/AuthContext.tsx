@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getSupabase, getSupabaseConfig, saveSupabaseConfig } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
 
 export interface PilotUser {
@@ -24,7 +24,6 @@ interface AuthContextType {
   signUp: (email: string, pass: string, name: string, callsign: string) => Promise<{ success: boolean; error?: string }>;
   signInAsDemo: (pilotName?: string) => void;
   signOut: () => Promise<void>;
-  updateSupabaseCredentials: (url: string, key: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,29 +47,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [config, setConfig] = useState(getSupabaseConfig());
 
   useEffect(() => {
-    localStorage.setItem('aviator_auth_user', JSON.stringify(user));
+    if (user) {
+      localStorage.setItem('aviator_auth_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('aviator_auth_user');
+    }
   }, [user]);
 
   useEffect(() => {
-    if (!config.isConfigured) {
+    if (!isSupabaseConfigured) {
       setLoading(false);
       return;
     }
 
     try {
-      const supabase = getSupabase();
-
-      // Get current session
+      // Get current session from Supabase
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           setSupabaseUser(session.user);
           setUser({
             id: session.user.id,
             email: session.user.email || '',
-            fullName: session.user.user_metadata?.full_name || 'Comandante',
+            fullName: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Comandante',
             callsign: session.user.user_metadata?.callsign || 'Piloto VFR',
             rank: 'Capitão',
             avatarUrl: session.user.user_metadata?.avatar_url,
@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser({
             id: session.user.id,
             email: session.user.email || '',
-            fullName: session.user.user_metadata?.full_name || 'Comandante',
+            fullName: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Comandante',
             callsign: session.user.user_metadata?.callsign || 'Piloto VFR',
             rank: 'Capitão',
             isDemo: false,
@@ -102,27 +102,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authListener.subscription.unsubscribe();
       };
     } catch (err) {
-      console.warn('Supabase initialization warning:', err);
+      console.warn('Erro ao inicializar Supabase:', err);
       setLoading(false);
     }
-  }, [config.isConfigured]);
+  }, []);
 
   const signIn = async (email: string, pass: string) => {
-    if (!config.isConfigured) {
-      // Offline / Local login
-      setUser({
+    if (!isSupabaseConfigured) {
+      // Fallback local caso as chaves ainda não tenham sido inseridas no código
+      const localPilot: PilotUser = {
         id: 'local-' + Date.now(),
         email,
         fullName: email.split('@')[0].toUpperCase(),
         callsign: 'Piloto ' + email.split('@')[0],
         rank: 'Primeiro Oficial',
         isDemo: true,
-      });
+      };
+      setUser(localPilot);
       return { success: true };
     }
 
     try {
-      const supabase = getSupabase();
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password: pass,
@@ -137,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({
           id: data.user.id,
           email: data.user.email || '',
-          fullName: data.user.user_metadata?.full_name || 'Comandante',
+          fullName: data.user.user_metadata?.full_name || email.split('@')[0],
           callsign: data.user.user_metadata?.callsign || 'Piloto',
           rank: 'Capitão',
           isDemo: false,
@@ -146,25 +146,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Erro ao conectar com Supabase' };
+      return { success: false, error: err.message || 'Erro ao conectar ao Supabase' };
     }
   };
 
   const signUp = async (email: string, pass: string, name: string, callsign: string) => {
-    if (!config.isConfigured) {
-      setUser({
+    if (!isSupabaseConfigured) {
+      const localPilot: PilotUser = {
         id: 'local-' + Date.now(),
         email,
         fullName: name,
-        callsign: callsign || 'Piloto',
+        callsign: callsign || 'Piloto VFR',
         rank: 'Comandante',
         isDemo: true,
-      });
+      };
+      setUser(localPilot);
       return { success: true };
     }
 
     try {
-      const supabase = getSupabase();
       const { data, error } = await supabase.auth.signUp({
         email,
         password: pass,
@@ -204,22 +204,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    if (config.isConfigured) {
+    if (isSupabaseConfigured) {
       try {
-        const supabase = getSupabase();
         await supabase.auth.signOut();
       } catch (err) {
-        console.warn('Signout error:', err);
+        console.warn('Erro ao sair do Supabase:', err);
       }
     }
     localStorage.removeItem('aviator_auth_user');
     setSupabaseUser(null);
     setUser(null);
-  };
-
-  const updateSupabaseCredentials = (url: string, key: string) => {
-    saveSupabaseConfig(url, key);
-    setConfig(getSupabaseConfig());
   };
 
   return (
@@ -228,14 +222,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         supabaseUser,
         loading,
-        isSupabaseConfigured: config.isConfigured,
-        supabaseUrl: config.url,
-        supabaseKey: config.key,
+        isSupabaseConfigured,
+        supabaseUrl: SUPABASE_URL,
+        supabaseKey: SUPABASE_ANON_KEY,
         signIn,
         signUp,
         signInAsDemo,
         signOut,
-        updateSupabaseCredentials,
       }}
     >
       {children}
@@ -246,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
 };
