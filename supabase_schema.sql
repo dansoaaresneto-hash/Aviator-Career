@@ -141,3 +141,42 @@ CREATE TRIGGER on_auth_user_created
 -- SET is_admin = true, rank_title = 'Administrador de Frota' 
 -- WHERE email = 'seu-email@dominio.com';
 -- =========================================================================
+
+-- 5. TABELA DE TELEMETRIA DO SIMULADOR (sim_telemetry)
+-- Guarda a última telemetria enviada pelo conector Python de cada piloto.
+-- A identidade aqui é o Token PIN (ex: AV-119735), não o login do Supabase
+-- Auth — por isso as políticas de RLS abaixo são abertas (o token já funciona
+-- como o "segredo" que identifica cada piloto).
+CREATE TABLE IF NOT EXISTS public.sim_telemetry (
+  token TEXT PRIMARY KEY,
+  connected BOOLEAN DEFAULT TRUE,
+  sim_name TEXT,
+  airport_icao TEXT,
+  aircraft_title TEXT,
+  total_weight_kg NUMERIC(10,2) DEFAULT 0,
+  payload_kg NUMERIC(10,2) DEFAULT 0,
+  fuel_kg NUMERIC(10,2) DEFAULT 0,
+  latitude NUMERIC(10,6) DEFAULT 0,
+  longitude NUMERIC(10,6) DEFAULT 0,
+  altitude_ft NUMERIC(10,2) DEFAULT 0,
+  ground_speed_kts NUMERIC(10,2) DEFAULT 0,
+  on_ground BOOLEAN DEFAULT TRUE,
+  last_updated TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.sim_telemetry ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Backend pode ler telemetria" ON public.sim_telemetry;
+CREATE POLICY "Backend pode ler telemetria"
+  ON public.sim_telemetry FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Backend pode inserir telemetria" ON public.sim_telemetry;
+CREATE POLICY "Backend pode inserir telemetria"
+  ON public.sim_telemetry FOR INSERT
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Backend pode atualizar telemetria" ON public.sim_telemetry;
+CREATE POLICY "Backend pode atualizar telemetria"
+  ON public.sim_telemetry FOR UPDATE
+  USING (true);

@@ -1,5 +1,14 @@
 import express from 'express';
 import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+
+// Mesmas credenciais públicas (chave anônima) já usadas no frontend
+// (src/lib/supabase.ts). Usamos aqui no backend para guardar a telemetria
+// de forma persistente e compartilhada entre todas as instâncias da Vercel
+// — substituindo o Map em memória, que se perdia entre instâncias.
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://vaqnidpnmjmkhhepyyyi.supabase.co';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhcW5pZHBubWpta2hoZXB5eXlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjg1NTIsImV4cCI6MjEwMDg0NDU1Mn0.f8n9A9VtrrYou0bz_AkRqkOpYnzpdhL8nOF-kTEY8a8';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const AIRAC_API_BASE = 'https://airac.net/api/v1';
 const AIRAC_USER_AGENT = 'AviatorMSFSFlightPlanner/1.0 (https://ai.studio; flightplanner@aviator-msfs.app)';
@@ -218,7 +227,78 @@ app.get('/api/metar/:icao', async (req, res) => {
 
 // ---------------- TELEMETRY & CONNECTOR API ---------------- //
 
+// Guarda a telemetria no Supabase (compartilhado entre todas as instâncias da
+// Vercel). O Map local continua existindo só como fallback de emergência,
+// caso o Supabase fique indisponível por algum motivo.
 const telemetryStore = new Map<string, any>();
+
+async function saveTelemetry(token: string, data: any) {
+  telemetryStore.set(token, data);
+  try {
+    const { error } = await supabase.from('sim_telemetry').upsert(
+      {
+        token,
+        connected: data.connected,
+        sim_name: data.simName,
+        airport_icao: data.airportIcao,
+        aircraft_title: data.aircraftTitle,
+        total_weight_kg: data.totalWeightKg,
+        payload_kg: data.payloadKg,
+        fuel_kg: data.fuelKg,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        altitude_ft: data.altitudeFt,
+        ground_speed_kts: data.groundSpeedKts,
+        on_ground: data.onGround,
+        last_updated: data.lastUpdated,
+      },
+      { onConflict: 'token' }
+    );
+    if (error) {
+      console.warn('[Supabase] Falha ao salvar telemetria, usando fallback em memória:', error.message);
+    }
+  } catch (err: any) {
+    console.warn('[Supabase] Erro ao contatar o banco para salvar telemetria:', err?.message || err);
+  }
+}
+
+async function loadTelemetry(token: string) {
+  try {
+    const { data, error } = await supabase
+      .from('sim_telemetry')
+      .select('*')
+      .eq('token', token)
+      .maybeSingle();
+
+    if (!error && data) {
+      return {
+        token: data.token,
+        connected: data.connected,
+        simName: data.sim_name,
+        airportIcao: data.airport_icao,
+        aircraftTitle: data.aircraft_title,
+        totalWeightKg: data.total_weight_kg,
+        payloadKg: data.payload_kg,
+        fuelKg: data.fuel_kg,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        altitudeFt: data.altitude_ft,
+        groundSpeedKts: data.ground_speed_kts,
+        onGround: data.on_ground,
+        lastUpdated: data.last_updated,
+      };
+    }
+    if (error) {
+      console.warn('[Supabase] Falha ao ler telemetria, usando fallback em memória:', error.message);
+    }
+  } catch (err: any) {
+    console.warn('[Supabase] Erro ao contatar o banco para ler telemetria:', err?.message || err);
+  }
+
+  // Fallback: só funciona se a requisição cair na mesma instância que recebeu
+  // os dados do conector (não garantido na Vercel).
+  return telemetryStore.get(token) || null;
+}
 
 // POST /api/telemetry - Receive telemetry from local Python connector script
 app.post('/api/telemetry', async (req, res) => {
@@ -261,7 +341,7 @@ app.post('/api/telemetry', async (req, res) => {
     isSimulated: false,
   };
 
-  telemetryStore.set(token, telemetryData);
+  await saveTelemetry(token, telemetryData);
 
   return res.json({
     status: 'success',
@@ -271,13 +351,13 @@ app.post('/api/telemetry', async (req, res) => {
 });
 
 // GET /api/telemetry - Retrieve telemetry for given user token
-app.get('/api/telemetry', (req, res) => {
+app.get('/api/telemetry', async (req, res) => {
   const token = (req.query.token as string) || '';
   if (!token) {
     return res.status(400).json({ status: 'error', message: 'Token é necessário' });
   }
 
-  const data = telemetryStore.get(token);
+  const data = await loadTelemetry(token);
   if (!data) {
     return res.json({
       status: 'success',
