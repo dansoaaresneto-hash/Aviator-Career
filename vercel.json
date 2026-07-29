@@ -3,5 +3,12 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" }
+  ],
+  "redirects": [
+    {
+      "source": "/downloads/AviatorConnector.exe",
+      "destination": "https://github.com/dansoaaresneto-hash/Aviator-Career/releases/latest/download/AviatorConnector.exe",
+      "permanent": false
+    }
   ]
 }

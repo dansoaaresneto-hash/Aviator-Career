@@ -30,20 +30,19 @@ jobs:
         run: |
           pyinstaller --onefile --console --name AviatorConnector --collect-all SimConnect connector/aviator_connector.py
 
-      - name: Copy EXE into the app's public folder
-        shell: bash
-        run: |
-          mkdir -p public/downloads
-          cp dist/AviatorConnector.exe public/downloads/AviatorConnector.exe
-
-      - name: Commit and push the updated EXE
-        shell: bash
-        run: |
-          git config user.name "aviator-bot"
-          git config user.email "actions@github.com"
-          git add public/downloads/AviatorConnector.exe
-          git commit -m "chore: atualiza AviatorConnector.exe [skip ci]" || echo "Nada para commitar"
-          git push
+      # Publicamos o .exe como um GitHub Release (fora da árvore de arquivos
+      # do repositório) para que ele NUNCA seja apagado quando o Google AI
+      # Studio sincronizar/commitar o projeto novamente. O link de download
+      # do site aponta para releases/latest/download/AviatorConnector.exe,
+      # que sempre resolve para o arquivo publicado aqui.
+      - name: Publish EXE as GitHub Release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: connector-latest
+          name: Aviator Connector (build automático)
+          body: "Executável gerado automaticamente a partir de connector/aviator_connector.py."
+          make_latest: true
+          files: dist/AviatorConnector.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
