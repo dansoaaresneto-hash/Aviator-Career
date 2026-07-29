@@ -66,6 +66,31 @@ def try_connect_simconnect():
         has_simconnect = False
 
 
+def get_total_payload_weight():
+    """Soma o peso de TODAS as estações de carga do avião (piloto, passageiro,
+    bagagem, carga, etc). Cada estação é reportada separadamente pelo MSFS —
+    ler só a estação 1 pega apenas o piloto, por isso o peso não mudava quando
+    a carga era alterada no EFB."""
+    try:
+        station_count = int(aq.get("PAYLOAD_STATION_COUNT") or 0)
+    except (TypeError, ValueError):
+        station_count = 0
+
+    if station_count <= 0:
+        # Sem contagem disponível: tenta as primeiras 10 estações mesmo assim
+        station_count = 10
+
+    total = 0.0
+    for i in range(1, station_count + 1):
+        try:
+            w = aq.get(f"PAYLOAD_STATION_WEIGHT:{i}")
+            if w:
+                total += float(w)
+        except Exception:
+            break
+    return total
+
+
 def get_telemetry():
     global has_simconnect
     if not has_simconnect:
@@ -79,7 +104,7 @@ def get_telemetry():
             speed = aq.get("AIRSPEED_INDICATED") or 0
             aircraft = aq.get("TITLE") or "Aeronave desconhecida"
             weight = aq.get("TOTAL_WEIGHT") or 0
-            payload = aq.get("PAYLOAD_STATION_WEIGHT:1") or 0
+            payload = get_total_payload_weight()
             fuel = aq.get("FUEL_TOTAL_QUANTITY_WEIGHT") or 0
             on_ground = aq.get("SIM_ON_GROUND")
 
