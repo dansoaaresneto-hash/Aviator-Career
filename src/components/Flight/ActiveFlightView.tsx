@@ -61,9 +61,6 @@ export const ActiveFlightView: React.FC = () => {
     } else if (flightPhase === 'cruise') {
       setSimulatedSpeed(145);
       setSimulatedAltitude(8500);
-    } else if (flightPhase === 'approach') {
-      setSimulatedSpeed(80);
-      setSimulatedAltitude(1200);
     } else if (flightPhase === 'landed') {
       setSimulatedSpeed(0);
       setSimulatedAltitude(0);
@@ -73,10 +70,9 @@ export const ActiveFlightView: React.FC = () => {
 
   const phases = [
     { id: 'briefing', label: '1. Briefing', pct: 10 },
-    { id: 'taxi', label: '2. Táxi / Decolagem', pct: 30 },
-    { id: 'cruise', label: '3. Cruzeiro', pct: 65 },
-    { id: 'approach', label: '4. Aproximação', pct: 90 },
-    { id: 'landed', label: '5. Pouso Concluído', pct: 100 },
+    { id: 'taxi', label: '2. Táxi', pct: 35 },
+    { id: 'cruise', label: '3. Em Voo', pct: 70 },
+    { id: 'landed', label: '4. Pouso Concluído', pct: 100 },
   ];
 
   return (
@@ -128,7 +124,7 @@ export const ActiveFlightView: React.FC = () => {
           </div>
 
           {/* Phase steps */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 text-[11px]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-[11px]">
             {phases.map((p) => {
               const isCurrent = flightPhase === p.id;
               return (
@@ -190,19 +186,29 @@ export const ActiveFlightView: React.FC = () => {
           </p>
 
           <div className="bg-slate-50 p-5 rounded-lg border border-slate-200/70 mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-extrabold uppercase text-slate-400">Etapa Atual</span>
-              <span className="text-xs font-black text-sky-600 uppercase bg-sky-100 px-3 py-1 rounded-md">
-                {flightPhase}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase text-slate-400">Etapa Atual</span>
+                {(connectionStatus === 'connected' || connectionStatus === 'simulated' || telemetry.connected) && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                    <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+                    Sincronizado Automático MSFS
+                  </span>
+                )}
+              </div>
+              <span className="text-xs font-black text-sky-700 uppercase bg-sky-100 border border-sky-200 px-3 py-1 rounded-md">
+                {flightPhase === 'briefing' && '1. Briefing / Pátio'}
+                {flightPhase === 'taxi' && '2. Táxi'}
+                {flightPhase === 'cruise' && '3. Em Voo'}
+                {flightPhase === 'landed' && '4. Pouso Concluído'}
               </span>
             </div>
 
             <p className="text-xs text-slate-700 font-medium leading-relaxed">
-              {flightPhase === 'briefing' && 'Configure seu plano de voo no MSFS, sintonize as frequências de comunicação e prepare a aeronave para acionamento dos motores no pátio de partida.'}
-              {flightPhase === 'taxi' && 'Efetue o táxi até a pista em uso, solicite autorização de decolagem e inicie a corrida de decolagem conforme os parâmetros do manual do avião.'}
-              {flightPhase === 'cruise' && 'Acompanhe os marcadores de navegação ao longo da rota até o ponto de aproximação.'}
-              {flightPhase === 'approach' && 'Inicie a descida, ative os procedimentos de aproximação final e estabilize a aeronave na rampa para o pouso.'}
-              {flightPhase === 'landed' && 'Pouso efetuado! Realize o táxi até o pátio de estacionamento e efetue o corte dos motores.'}
+              {flightPhase === 'briefing' && 'Configure seu plano de voo no MSFS, sintonize as frequências e prepare a aeronave no pátio de partida ou ponto de espera.'}
+              {flightPhase === 'taxi' && 'Movimento detectado! Realize o táxi até a pista em uso, solicite autorização e inicie a corrida de decolagem.'}
+              {flightPhase === 'cruise' && 'Aeronave em voo! Acompanhe os parâmetros de navegação até o aeroporto de destino.'}
+              {flightPhase === 'landed' && 'Pouso efetuado com sucesso! Realize o táxi até o pátio e efetue o corte dos motores.'}
             </p>
           </div>
 

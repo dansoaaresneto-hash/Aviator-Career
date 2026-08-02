@@ -138,6 +138,13 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     setTelemetry(simData);
     setConnectionStatus('simulated');
+
+    // Sync to server so pilot appears in live radar
+    fetch('/api/telemetry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(simData),
+    }).catch(() => {});
   };
 
   const stopVirtualSimulation = () => {

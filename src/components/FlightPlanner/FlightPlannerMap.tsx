@@ -39,11 +39,40 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
   const [showRouteLine, setShowRouteLine] = useState<boolean>(true);
   const [showFixLabels, setShowFixLabels] = useState<boolean>(false);
 
-  // Map Tile Source URLs (Using CARTO & OpenStreetMap as requested)
-  const tileUrls = {
-    'carto-light': 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    'carto-dark': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    'osm': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  // Map Tile Source configurations with correct subdomains & zoom limits per layer
+  const tileConfigs = {
+    'carto-light': {
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      options: {
+        maxZoom: 19,
+        maxNativeZoom: 18,
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      },
+    },
+    'carto-dark': {
+      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      options: {
+        maxZoom: 19,
+        maxNativeZoom: 18,
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      },
+    },
+    'osm': {
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      options: {
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        subdomains: ['a', 'b', 'c'], // OSM only has subdomains a, b, c (subdomain 'd' causes 404 gray tiles)
+        attribution: '&copy; OpenStreetMap contributors',
+      },
+    },
+  };
+
+  const createTileLayer = (style: 'carto-light' | 'carto-dark' | 'osm') => {
+    const config = tileConfigs[style] || tileConfigs['carto-light'];
+    return L.tileLayer(config.url, config.options);
   };
 
   // Initialize Leaflet Map
@@ -61,15 +90,25 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
       attributionControl: false,
     });
 
-    const tileLayer = L.tileLayer(tileUrls[mapTileStyle], {
-      maxZoom: 18,
-      subdomains: 'abcd',
-    }).addTo(map);
+    const tileLayer = createTileLayer(mapTileStyle).addTo(map);
 
     tileLayerRef.current = tileLayer;
     markersLayerGroupRef.current = L.layerGroup().addTo(map);
     routeLayerGroupRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+
+    // Invalidate size on mount and container size change to prevent blank tile grid
+    const invalidateTimeout = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
 
     // Track move/zoom events
     const handleMoveEnd = () => {
@@ -85,6 +124,8 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
     fetchFixesForMapArea(initialLat, initialLng, 350);
 
     return () => {
+      clearTimeout(invalidateTimeout);
+      resizeObserver.disconnect();
       map.off('moveend', handleMoveEnd);
       map.remove();
       mapRef.current = null;
@@ -97,11 +138,9 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
     if (tileLayerRef.current) {
       mapRef.current.removeLayer(tileLayerRef.current);
     }
-    const newTile = L.tileLayer(tileUrls[mapTileStyle], {
-      maxZoom: 18,
-      subdomains: 'abcd',
-    }).addTo(mapRef.current);
+    const newTile = createTileLayer(mapTileStyle).addTo(mapRef.current);
     tileLayerRef.current = newTile;
+    mapRef.current.invalidateSize();
   }, [mapTileStyle]);
 
   // Fetch fixes when center changes with debounce

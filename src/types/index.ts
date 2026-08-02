@@ -111,7 +111,7 @@ export interface PilotProfile {
   preferredCallsign: string;
 }
 
-export type ActiveTab = 'overview' | 'missions' | 'active-flight' | 'flight-planner' | 'fleet' | 'logbook' | 'profile' | 'settings' | 'connector';
+export type ActiveTab = 'overview' | 'missions' | 'active-flight' | 'flight-planner' | 'live-map' | 'fleet' | 'logbook' | 'profile' | 'settings' | 'connector';
 
 export * from './telemetry';
 

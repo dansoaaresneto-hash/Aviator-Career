@@ -13,7 +13,8 @@ import {
   Award,
   ShieldCheck,
   Compass,
-  Laptop
+  Laptop,
+  Radio
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -36,6 +37,12 @@ export const Sidebar: React.FC = () => {
       label: 'Planejador de Voo',
       icon: <Compass className="w-5 h-5 text-amber-500" />,
       badge: 'AIRAC',
+    },
+    {
+      id: 'live-map',
+      label: 'Mapa ao Vivo',
+      icon: <Radio className="w-5 h-5 text-emerald-500 animate-pulse" />,
+      badge: 'RADAR',
     },
     {
       id: 'connector',

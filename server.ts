@@ -302,7 +302,7 @@ async function loadTelemetry(token: string) {
 
 // POST /api/telemetry - Receive telemetry from local Python connector script
 app.post('/api/telemetry', async (req, res) => {
-  const { token, airportIcao, aircraftTitle, totalWeightKg, payloadKg, fuelKg, latitude, longitude, altitudeFt, groundSpeedKts, onGround, simName } = req.body;
+  const { token, airportIcao, aircraftTitle, totalWeightKg, payloadKg, fuelKg, latitude, longitude, altitudeFt, groundSpeedKts, onGround, simName, pilotName, callsign } = req.body;
 
   if (!token) {
     return res.status(400).json({ status: 'error', message: 'Token de conexão obrigatório' });
@@ -334,9 +334,11 @@ app.post('/api/telemetry', async (req, res) => {
     fuelKg: Number(fuelKg) || 120,
     latitude: latNum,
     longitude: lonNum,
-    altitudeFt: Number(altitudeFt) || 2450,
+    altitudeFt: altitudeFt !== undefined && altitudeFt !== null ? Number(altitudeFt) : 0,
     groundSpeedKts: Number(groundSpeedKts) || 0,
     onGround: Boolean(onGround),
+    pilotName: pilotName || undefined,
+    callsign: callsign || undefined,
     lastUpdated: new Date().toISOString(),
     isSimulated: false,
   };
@@ -348,6 +350,82 @@ app.post('/api/telemetry', async (req, res) => {
     message: 'Telemetria do simulador recebida com sucesso',
     receivedAt: telemetryData.lastUpdated,
   });
+});
+
+// GET /api/telemetry/live - Retrieve all currently active connected pilots (real telemetry only)
+app.get('/api/telemetry/live', async (req, res) => {
+  try {
+    const cutoffTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+    const activePilotsMap = new Map<string, any>();
+
+    // 1. Fetch from Supabase sim_telemetry
+    try {
+      const { data, error } = await supabase
+        .from('sim_telemetry')
+        .select('*')
+        .eq('connected', true)
+        .gte('last_updated', cutoffTime);
+
+      if (!error && Array.isArray(data)) {
+        for (const item of data) {
+          activePilotsMap.set(item.token, {
+            token: item.token,
+            connected: item.connected,
+            pilotName: item.pilot_name || item.callsign || `Piloto (${item.token})`,
+            callsign: item.callsign || item.token,
+            simName: item.sim_name || 'MSFS 2020',
+            airportIcao: item.airport_icao || '---',
+            aircraftTitle: item.aircraft_title || 'Aeronave',
+            latitude: Number(item.latitude) || 0,
+            longitude: Number(item.longitude) || 0,
+            altitudeFt: Number(item.altitude_ft) || 0,
+            groundSpeedKts: Number(item.ground_speed_kts) || 0,
+            onGround: Boolean(item.on_ground),
+            lastUpdated: item.last_updated,
+          });
+        }
+      }
+    } catch (dbErr) {
+      console.warn('Erro ao consultar sim_telemetry no Supabase:', dbErr);
+    }
+
+    // 2. Merge with in-memory telemetryStore fallback
+    const nowMs = Date.now();
+    for (const [token, item] of telemetryStore.entries()) {
+      const updatedMs = new Date(item.lastUpdated || 0).getTime();
+      if (item.connected && nowMs - updatedMs <= 5 * 60 * 1000) {
+        if (!activePilotsMap.has(token) || new Date(item.lastUpdated).getTime() > new Date(activePilotsMap.get(token).lastUpdated).getTime()) {
+          activePilotsMap.set(token, {
+            token: item.token,
+            connected: item.connected,
+            pilotName: item.pilotName || item.callsign || `Piloto (${token})`,
+            callsign: item.callsign || token,
+            simName: item.simName || 'MSFS 2020',
+            airportIcao: item.airportIcao || '---',
+            aircraftTitle: item.aircraftTitle || 'Aeronave',
+            latitude: Number(item.latitude) || 0,
+            longitude: Number(item.longitude) || 0,
+            altitudeFt: Number(item.altitudeFt) || 0,
+            groundSpeedKts: Number(item.groundSpeedKts) || 0,
+            onGround: Boolean(item.onGround),
+            lastUpdated: item.lastUpdated,
+          });
+        }
+      }
+    }
+
+    const pilots = Array.from(activePilotsMap.values());
+
+    return res.json({
+      status: 'success',
+      count: pilots.length,
+      pilots,
+    });
+  } catch (err: any) {
+    console.error('Erro na rota /api/telemetry/live:', err);
+    return res.status(500).json({ status: 'error', message: 'Erro ao carregar mapa de telemetria ao vivo' });
+  }
 });
 
 // GET /api/telemetry - Retrieve telemetry for given user token

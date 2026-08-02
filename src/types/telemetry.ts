@@ -1,3 +1,19 @@
+export interface OnlinePilotData {
+  token: string;
+  connected: boolean;
+  pilotName?: string;
+  callsign?: string;
+  simName: string;
+  airportIcao: string;
+  aircraftTitle: string;
+  latitude: number;
+  longitude: number;
+  altitudeFt: number;
+  groundSpeedKts: number;
+  onGround: boolean;
+  lastUpdated: string;
+}
+
 export interface SimTelemetryData {
   token: string;
   connected: boolean;

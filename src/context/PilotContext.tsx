@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Contract, FlightLog, PilotProfile, ActiveTab } from '../types';
 import { INITIAL_CONTRACTS } from '../data/initialContracts';
+import { useTelemetry } from './TelemetryContext';
 
 interface PilotContextType {
   profile: PilotProfile;
@@ -9,7 +10,9 @@ interface PilotContextType {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   flightPhase: 'briefing' | 'taxi' | 'cruise' | 'approach' | 'landed' | null;
+  setFlightPhase: (phase: 'briefing' | 'taxi' | 'cruise' | 'approach' | 'landed' | null) => void;
   flightProgress: number; // 0 to 100
+  setFlightProgress: React.Dispatch<React.SetStateAction<number>>;
   logbook: FlightLog[];
   acceptContract: (contract: Contract) => void;
   abandonContract: () => void;
@@ -42,6 +45,8 @@ const INITIAL_PROFILE: PilotProfile = {
 const PilotContext = createContext<PilotContextType | undefined>(undefined);
 
 export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { telemetry, connectionStatus } = useTelemetry();
+
   const [profile, setProfile] = useState<PilotProfile>(() => {
     const saved = localStorage.getItem('aviator_pilot_profile');
     if (saved) {
@@ -61,8 +66,20 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
-  const [flightPhase, setFlightPhase] = useState<'briefing' | 'taxi' | 'cruise' | 'approach' | 'landed' | null>(null);
-  const [flightProgress, setFlightProgress] = useState<number>(0);
+  
+  const [flightPhase, setFlightPhase] = useState<'briefing' | 'taxi' | 'cruise' | 'approach' | 'landed' | null>(() => {
+    const savedContract = localStorage.getItem('aviator_active_contract');
+    if (!savedContract) return null;
+    const savedPhase = localStorage.getItem('aviator_flight_phase');
+    return (savedPhase as any) || 'briefing';
+  });
+
+  const [flightProgress, setFlightProgress] = useState<number>(() => {
+    const savedContract = localStorage.getItem('aviator_active_contract');
+    if (!savedContract) return 0;
+    const savedProgress = localStorage.getItem('aviator_flight_progress');
+    return savedProgress ? Number(savedProgress) : 10;
+  });
 
   const [logbook, setLogbook] = useState<FlightLog[]>(() => {
     const saved = localStorage.getItem('aviator_logbook');
@@ -88,8 +105,81 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [activeContract]);
 
   useEffect(() => {
+    if (flightPhase) {
+      localStorage.setItem('aviator_flight_phase', flightPhase);
+    } else {
+      localStorage.removeItem('aviator_flight_phase');
+    }
+  }, [flightPhase]);
+
+  useEffect(() => {
+    if (flightProgress > 0) {
+      localStorage.setItem('aviator_flight_progress', String(flightProgress));
+    } else {
+      localStorage.removeItem('aviator_flight_progress');
+    }
+  }, [flightProgress]);
+
+  useEffect(() => {
     localStorage.setItem('aviator_logbook', JSON.stringify(logbook));
   }, [logbook]);
+
+  // Automatic Flight Phase State Machine driven by telemetry (MSFS or Virtual Test)
+  useEffect(() => {
+    if (!activeContract) return;
+
+    const isConnected = connectionStatus === 'connected' || connectionStatus === 'simulated' || telemetry.connected;
+    if (!isConnected) return;
+
+    const speed = Number(telemetry.groundSpeedKts) || 0;
+    const altitude = Number(telemetry.altitudeFt) || 0;
+    const onGround = Boolean(telemetry.onGround);
+
+    // If active contract exists but phase was null, default to briefing
+    if (!flightPhase) {
+      setFlightPhase('briefing');
+      setFlightProgress(10);
+      return;
+    }
+
+    // Phase 1: Briefing -> Taxi (Triggers as soon as any movement speed >= 1 knot is detected on ground)
+    if (flightPhase === 'briefing') {
+      if (onGround && speed >= 1) {
+        setFlightPhase('taxi');
+        setFlightProgress(25);
+      } else if (!onGround) {
+        // Connected while already airborne
+        setFlightPhase('cruise');
+        setFlightProgress(60);
+      }
+    }
+    // Phase 2: Taxi -> Em Voo (cruise) (Triggers ONLY when the aircraft actually takes off / leaves ground)
+    else if (flightPhase === 'taxi') {
+      if (!onGround) {
+        // Takeoff detected! Aircraft left the ground
+        setFlightPhase('cruise');
+        setFlightProgress(60);
+      } else if (onGround) {
+        // Dynamic taxi progress scaling from 25% to 45% based on movement
+        if (speed >= 1) {
+          const taxiBonus = Math.min(20, Math.round((speed / 50) * 20));
+          setFlightProgress((prev) => Math.max(prev, 25 + taxiBonus));
+        }
+      }
+    }
+    // Phase 3: Em Voo (cruise) -> Pouso Concluído (landed) (Triggers ONLY when aircraft lands back on ground)
+    else if (flightPhase === 'cruise') {
+      if (onGround) {
+        // Landing detected! Aircraft touched down on ground
+        setFlightPhase('landed');
+        setFlightProgress(100);
+      } else if (!onGround) {
+        // Cruise progress smoothly advances up to 95% based on speed
+        const cruiseBonus = Math.min(35, Math.round((speed / 180) * 35));
+        setFlightProgress((prev) => Math.max(prev, Math.min(95, 60 + cruiseBonus)));
+      }
+    }
+  }, [telemetry, connectionStatus, activeContract, flightPhase]);
 
   const acceptContract = (contract: Contract) => {
     setActiveContract(contract);
@@ -136,9 +226,6 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setFlightPhase('cruise');
       setFlightProgress(60);
     } else if (flightPhase === 'cruise') {
-      setFlightPhase('approach');
-      setFlightProgress(88);
-    } else if (flightPhase === 'approach') {
       setFlightPhase('landed');
       setFlightProgress(100);
     }
@@ -238,7 +325,9 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         activeTab,
         setActiveTab,
         flightPhase,
+        setFlightPhase,
         flightProgress,
+        setFlightProgress,
         logbook,
         acceptContract,
         abandonContract,

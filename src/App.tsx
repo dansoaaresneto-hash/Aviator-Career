@@ -13,6 +13,7 @@ import { LogbookView } from './components/Logbook/LogbookView';
 import { ProfileView } from './components/Profile/ProfileView';
 import { SettingsView } from './components/Settings/SettingsView';
 import { ConnectorView } from './components/Connector/ConnectorView';
+import { LiveRadarView } from './components/LiveRadar/LiveRadarView';
 import { AuthScreen } from './components/Auth/AuthScreen';
 import { Plane } from 'lucide-react';
 
@@ -27,6 +28,7 @@ const MainContent: React.FC = () => {
         {activeTab === 'overview' && <Overview />}
         {activeTab === 'missions' && <MissionsView />}
         {activeTab === 'flight-planner' && <FlightPlannerView />}
+        {activeTab === 'live-map' && <LiveRadarView />}
         {activeTab === 'active-flight' && <ActiveFlightView />}
         {activeTab === 'connector' && <ConnectorView />}
         {activeTab === 'fleet' && <FleetView />}
@@ -59,14 +61,14 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <PilotProvider>
-      <TelemetryProvider>
+    <TelemetryProvider>
+      <PilotProvider>
         <div className="min-h-screen bg-[#edf1f7] font-sans text-slate-800 p-4 md:p-6 lg:p-8 flex flex-col md:flex-row gap-6 selection:bg-sky-500 selection:text-white">
           <Sidebar />
           <MainContent />
         </div>
-      </TelemetryProvider>
-    </PilotProvider>
+      </PilotProvider>
+    </TelemetryProvider>
   );
 };
 
