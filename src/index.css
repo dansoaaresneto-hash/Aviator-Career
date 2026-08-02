@@ -48,3 +48,25 @@ body, button, input, select, textarea, * {
   background: #94a3b8;
 }
 
+/* Leaflet Custom Minimalist Radar Overrides */
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.custom-radar-tooltip {
+  background: rgba(15, 23, 42, 0.94) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(51, 65, 85, 0.8) !important;
+  color: #f8fafc !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 11px !important;
+}
+
+.custom-radar-tooltip::before {
+  border-top-color: rgba(15, 23, 42, 0.94) !important;
+}
+

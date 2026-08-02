@@ -9,10 +9,12 @@ interface PilotContextType {
   activeContract: Contract | null;
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
-  flightPhase: 'briefing' | 'taxi' | 'cruise' | 'approach' | 'landed' | null;
-  setFlightPhase: (phase: 'briefing' | 'taxi' | 'cruise' | 'approach' | 'landed' | null) => void;
+  flightPhase: 'briefing' | 'taxi' | 'cruise' | 'approach' | 'intermediate_landing' | 'landed' | null;
+  setFlightPhase: (phase: 'briefing' | 'taxi' | 'cruise' | 'approach' | 'intermediate_landing' | 'landed' | null) => void;
   flightProgress: number; // 0 to 100
   setFlightProgress: React.Dispatch<React.SetStateAction<number>>;
+  currentLocationIcao: string | null;
+  intermediateStops: Array<{ icao: string; timestamp: string }>;
   logbook: FlightLog[];
   acceptContract: (contract: Contract) => void;
   abandonContract: () => void;
@@ -81,6 +83,19 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return savedProgress ? Number(savedProgress) : 10;
   });
 
+  const [currentLocationIcao, setCurrentLocationIcao] = useState<string | null>(() => {
+    const savedContract = localStorage.getItem('aviator_active_contract');
+    if (!savedContract) return null;
+    return localStorage.getItem('aviator_current_location') || null;
+  });
+
+  const [intermediateStops, setIntermediateStops] = useState<Array<{ icao: string; timestamp: string }>>(() => {
+    const savedContract = localStorage.getItem('aviator_active_contract');
+    if (!savedContract) return [];
+    const saved = localStorage.getItem('aviator_intermediate_stops');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [logbook, setLogbook] = useState<FlightLog[]>(() => {
     const saved = localStorage.getItem('aviator_logbook');
     return saved ? JSON.parse(saved) : [];
@@ -101,8 +116,26 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStorage.setItem('aviator_active_contract', JSON.stringify(activeContract));
     } else {
       localStorage.removeItem('aviator_active_contract');
+      localStorage.removeItem('aviator_current_location');
+      localStorage.removeItem('aviator_intermediate_stops');
     }
   }, [activeContract]);
+
+  useEffect(() => {
+    if (currentLocationIcao) {
+      localStorage.setItem('aviator_current_location', currentLocationIcao);
+    } else {
+      localStorage.removeItem('aviator_current_location');
+    }
+  }, [currentLocationIcao]);
+
+  useEffect(() => {
+    if (intermediateStops.length > 0) {
+      localStorage.setItem('aviator_intermediate_stops', JSON.stringify(intermediateStops));
+    } else {
+      localStorage.removeItem('aviator_intermediate_stops');
+    }
+  }, [intermediateStops]);
 
   useEffect(() => {
     if (flightPhase) {
@@ -142,50 +175,81 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
-    // Phase 1: Briefing -> Taxi (Triggers as soon as any movement speed >= 1 knot is detected on ground)
-    if (flightPhase === 'briefing') {
+    // Phase 1: Briefing or Intermediate Landing -> Taxi (Triggers as soon as movement >= 1kt detected on ground)
+    if (flightPhase === 'briefing' || flightPhase === 'intermediate_landing') {
       if (onGround && speed >= 1) {
         setFlightPhase('taxi');
-        setFlightProgress(25);
+        setFlightProgress((prev) => Math.max(prev, 25));
       } else if (!onGround) {
-        // Connected while already airborne
+        // Connected or airborne
         setFlightPhase('cruise');
-        setFlightProgress(60);
+        setFlightProgress((prev) => Math.max(prev, 60));
       }
     }
-    // Phase 2: Taxi -> Em Voo (cruise) (Triggers ONLY when the aircraft actually takes off / leaves ground)
+    // Phase 2: Taxi -> Em Voo (cruise) (Triggers ONLY when the aircraft actually takes off)
     else if (flightPhase === 'taxi') {
       if (!onGround) {
-        // Takeoff detected! Aircraft left the ground
+        // Takeoff detected!
         setFlightPhase('cruise');
-        setFlightProgress(60);
+        setFlightProgress((prev) => Math.max(prev, 60));
       } else if (onGround) {
-        // Dynamic taxi progress scaling from 25% to 45% based on movement
         if (speed >= 1) {
           const taxiBonus = Math.min(20, Math.round((speed / 50) * 20));
           setFlightProgress((prev) => Math.max(prev, 25 + taxiBonus));
         }
       }
     }
-    // Phase 3: Em Voo (cruise) -> Pouso Concluído (landed) (Triggers ONLY when aircraft lands back on ground)
+    // Phase 3: Em Voo (cruise) -> Touchdown Landing Check
     else if (flightPhase === 'cruise') {
       if (onGround) {
-        // Landing detected! Aircraft touched down on ground
-        setFlightPhase('landed');
-        setFlightProgress(100);
+        // Aircraft touched down! Check if touchdown airport matches destination
+        const currentLandedIcao = (telemetry.airportIcao || '').trim().toUpperCase();
+        const targetArrivalIcao = (activeContract.route.arrivalIcao || '').trim().toUpperCase();
+
+        if (currentLandedIcao && currentLandedIcao === targetArrivalIcao) {
+          // TOUCHDOWN AT FINAL DESTINATION -> Complete Flight Phase
+          setFlightPhase('landed');
+          setFlightProgress(100);
+          setCurrentLocationIcao(targetArrivalIcao);
+        } else {
+          // TOUCHDOWN AT INTERMEDIATE / ALTERNATE AIRPORT
+          const stopIcao = currentLandedIcao || currentLocationIcao || 'INTERMEDIÁRIO';
+          setFlightPhase('intermediate_landing');
+          setCurrentLocationIcao(stopIcao);
+          
+          setIntermediateStops((prev) => {
+            if (prev.length > 0 && prev[prev.length - 1].icao === stopIcao) {
+              return prev;
+            }
+            return [
+              ...prev,
+              {
+                icao: stopIcao,
+                timestamp: new Date().toISOString(),
+              },
+            ];
+          });
+
+          // Keep progress active, set at 75% for intermediate stop
+          setFlightProgress((prev) => Math.min(90, Math.max(prev, 75)));
+        }
       } else if (!onGround) {
-        // Cruise progress smoothly advances up to 95% based on speed
+        // Cruise progress smoothly advances up to 95%
         const cruiseBonus = Math.min(35, Math.round((speed / 180) * 35));
         setFlightProgress((prev) => Math.max(prev, Math.min(95, 60 + cruiseBonus)));
       }
     }
-  }, [telemetry, connectionStatus, activeContract, flightPhase]);
+  }, [telemetry, connectionStatus, activeContract, flightPhase, currentLocationIcao]);
 
   const acceptContract = (contract: Contract) => {
     setActiveContract(contract);
     setSelectedContractForPreview(null);
     setFlightPhase('briefing');
     setFlightProgress(10);
+    setCurrentLocationIcao(contract.route.departureIcao);
+    setIntermediateStops([]);
+    localStorage.setItem('aviator_current_location', contract.route.departureIcao);
+    localStorage.removeItem('aviator_intermediate_stops');
     setActiveTab('active-flight');
   };
 
@@ -215,19 +279,31 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveContract(null);
     setFlightPhase(null);
     setFlightProgress(0);
+    setCurrentLocationIcao(null);
+    setIntermediateStops([]);
+    localStorage.removeItem('aviator_current_location');
+    localStorage.removeItem('aviator_intermediate_stops');
     setActiveTab('missions');
   };
 
   const advanceFlightPhase = () => {
-    if (flightPhase === 'briefing') {
+    if (flightPhase === 'briefing' || flightPhase === 'intermediate_landing') {
       setFlightPhase('taxi');
-      setFlightProgress(25);
+      setFlightProgress((prev) => Math.max(prev, 25));
     } else if (flightPhase === 'taxi') {
       setFlightPhase('cruise');
-      setFlightProgress(60);
+      setFlightProgress((prev) => Math.max(prev, 60));
     } else if (flightPhase === 'cruise') {
-      setFlightPhase('landed');
-      setFlightProgress(100);
+      const currentLandedIcao = (telemetry.airportIcao || '').trim().toUpperCase();
+      const targetArrivalIcao = (activeContract?.route.arrivalIcao || '').trim().toUpperCase();
+
+      if (currentLandedIcao && currentLandedIcao !== targetArrivalIcao) {
+        setFlightPhase('intermediate_landing');
+        setCurrentLocationIcao(currentLandedIcao);
+      } else {
+        setFlightPhase('landed');
+        setFlightProgress(100);
+      }
     }
   };
 
@@ -292,6 +368,10 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveContract(null);
     setFlightPhase(null);
     setFlightProgress(0);
+    setCurrentLocationIcao(null);
+    setIntermediateStops([]);
+    localStorage.removeItem('aviator_current_location');
+    localStorage.removeItem('aviator_intermediate_stops');
     setActiveTab('logbook');
   };
 
@@ -309,9 +389,15 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveContract(null);
     setFlightPhase(null);
     setFlightProgress(0);
+    setCurrentLocationIcao(null);
+    setIntermediateStops([]);
     setLogbook([]);
     localStorage.removeItem('aviator_pilot_profile');
     localStorage.removeItem('aviator_active_contract');
+    localStorage.removeItem('aviator_flight_phase');
+    localStorage.removeItem('aviator_flight_progress');
+    localStorage.removeItem('aviator_current_location');
+    localStorage.removeItem('aviator_intermediate_stops');
     localStorage.removeItem('aviator_logbook');
     setActiveTab('overview');
   };
@@ -328,6 +414,8 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setFlightPhase,
         flightProgress,
         setFlightProgress,
+        currentLocationIcao,
+        intermediateStops,
         logbook,
         acceptContract,
         abandonContract,

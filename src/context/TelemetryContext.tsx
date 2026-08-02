@@ -12,7 +12,7 @@ interface TelemetryContextType {
   updateTelemetry: (data: Partial<SimTelemetryData>) => void;
   startVirtualSimulation: (preset?: { airport?: string; aircraft?: string; payloadKg?: number }) => void;
   stopVirtualSimulation: () => void;
-  validateContract: (contract: Contract | null) => MissionValidationResult;
+  validateContract: (contract: Contract | null, expectedOriginIcao?: string) => MissionValidationResult;
   isPolling: boolean;
   setIsPolling: (polling: boolean) => void;
 }
@@ -157,7 +157,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Mission validation algorithm
   const validateContract = useCallback(
-    (contract: Contract | null): MissionValidationResult => {
+    (contract: Contract | null, expectedOriginIcao?: string): MissionValidationResult => {
       if (!contract) {
         return {
           overallStatus: 'pending',
@@ -190,6 +190,9 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
       }
 
+      const requiredOrigin = (expectedOriginIcao || contract.route.departureIcao || '').trim().toUpperCase();
+      const isIntermediate = Boolean(expectedOriginIcao && expectedOriginIcao !== contract.route.departureIcao);
+
       if (connectionStatus === 'disconnected' && !telemetry.connected) {
         return {
           overallStatus: 'pending',
@@ -197,10 +200,12 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           summaryText: 'Conecte o MSFS via conector do Aviator para validar seu voo.',
           airportCheck: {
             key: 'airport',
-            title: 'Aeroporto de Origem',
+            title: isIntermediate ? 'Última Posição Registrada' : 'Aeroporto de Origem',
             status: 'pending',
             currentValue: 'Aguardando MSFS',
-            requiredValue: `${contract.route.departureIcao} (${contract.route.departureCity})`,
+            requiredValue: isIntermediate
+              ? `${requiredOrigin} (Escala/Posição Salva)`
+              : `${requiredOrigin} (${contract.route.departureCity})`,
             message: 'Aguardando conexão com o simulador.',
           },
           aircraftCheck: {
@@ -224,17 +229,20 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       // 1. Airport Validation
       const currentAirport = (telemetry.airportIcao || '').trim().toUpperCase();
-      const requiredAirport = (contract.route.departureIcao || '').trim().toUpperCase();
 
       let airportStatus: ValidationStatus = 'invalid';
       let airportMsg = '';
 
-      if (currentAirport === requiredAirport) {
+      if (currentAirport === requiredOrigin) {
         airportStatus = 'valid';
-        airportMsg = `Localização confirmada no aeroporto de partida ${requiredAirport}.`;
+        airportMsg = isIntermediate
+          ? `Localização confirmada na posição atual/escala (${requiredOrigin}). Decolagem autorizada rumo ao destino final (${contract.route.arrivalIcao}).`
+          : `Localização confirmada no aeroporto de partida ${requiredOrigin}.`;
       } else {
         airportStatus = 'invalid';
-        airportMsg = `Você está posicionado em "${currentAirport || 'Desconhecido'}", porém a missão exige partida em "${requiredAirport}" (${contract.route.departureCity}). Mova a aeronave para ${requiredAirport}.`;
+        airportMsg = isIntermediate
+          ? `Sua aeronave está em "${currentAirport || 'Desconhecido'}", mas a última posição salva desta missão é "${requiredOrigin}". Mova a aeronave para ${requiredOrigin} para continuar o voo.`
+          : `Você está posicionado em "${currentAirport || 'Desconhecido'}", porém a missão exige partida em "${requiredOrigin}" (${contract.route.departureCity}). Mova a aeronave para ${requiredOrigin}.`;
       }
 
       // 2. Aircraft Validation

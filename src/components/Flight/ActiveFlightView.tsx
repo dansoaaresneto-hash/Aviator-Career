@@ -23,7 +23,15 @@ import {
 } from 'lucide-react';
 
 export const ActiveFlightView: React.FC = () => {
-  const { activeContract, flightPhase, flightProgress, advanceFlightPhase, abandonContract } = usePilot();
+  const {
+    activeContract,
+    flightPhase,
+    flightProgress,
+    advanceFlightPhase,
+    abandonContract,
+    currentLocationIcao,
+    intermediateStops,
+  } = usePilot();
   const { telemetry, connectionStatus, validateContract, setShowConnectorModal } = useTelemetry();
   const [showDebrief, setShowDebrief] = useState(false);
   const [simulatedSpeed, setSimulatedSpeed] = useState(0);
@@ -61,6 +69,9 @@ export const ActiveFlightView: React.FC = () => {
     } else if (flightPhase === 'cruise') {
       setSimulatedSpeed(145);
       setSimulatedAltitude(8500);
+    } else if (flightPhase === 'intermediate_landing') {
+      setSimulatedSpeed(0);
+      setSimulatedAltitude(0);
     } else if (flightPhase === 'landed') {
       setSimulatedSpeed(0);
       setSimulatedAltitude(0);
@@ -72,13 +83,50 @@ export const ActiveFlightView: React.FC = () => {
     { id: 'briefing', label: '1. Briefing', pct: 10 },
     { id: 'taxi', label: '2. Táxi', pct: 35 },
     { id: 'cruise', label: '3. Em Voo', pct: 70 },
-    { id: 'landed', label: '4. Pouso Concluído', pct: 100 },
+    { id: 'intermediate_landing', label: '4. Escala / Pouso', pct: 85 },
+    { id: 'landed', label: '5. Destino Final', pct: 100 },
   ];
+
+  const hasIntermediateStop = currentLocationIcao && currentLocationIcao !== activeContract.route.departureIcao;
 
   return (
     <div className="space-y-6">
       {/* Real-Time Pre-Flight Mission Validation Banner */}
       <MissionValidationBanner />
+
+      {/* Intermediate Landing / Alternate Airport Alert Banner */}
+      {hasIntermediateStop && flightPhase !== 'landed' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 text-amber-900 shadow-sm space-y-3">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-800 px-2.5 py-0.5 rounded border border-amber-500/30">
+                  Pouso Intermediário Registrado
+                </span>
+                <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  Contrato Ativo
+                </span>
+              </div>
+              <h4 className="font-extrabold text-slate-900 text-sm">
+                Aeronave Pousada em {currentLocationIcao} (Fora do Destino Final)
+              </h4>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                Detectamos um pouso em aeroporto alternativo ou escala técnica (<strong>{currentLocationIcao}</strong>). O contrato de voo com a <strong>{activeContract.company.name}</strong> continua <strong>ativo</strong>! A posição atual da aeronave está salva.
+              </p>
+              <div className="pt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-800">
+                <span className="text-slate-500">Próxima Perna:</span>
+                <span className="font-mono bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-900 shadow-xs">{currentLocationIcao}</span>
+                <ArrowRight className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="text-slate-500">Destino Final da Missão:</span>
+                <span className="font-mono bg-white px-2 py-0.5 rounded border border-sky-300 text-sky-900 shadow-xs">{activeContract.route.arrivalIcao}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top Banner: Flight Telemetry & Route */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-6 sm:p-8 text-white border border-slate-700 shadow-md">
@@ -124,13 +172,13 @@ export const ActiveFlightView: React.FC = () => {
           </div>
 
           {/* Phase steps */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-[11px]">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 text-[11px]">
             {phases.map((p) => {
               const isCurrent = flightPhase === p.id;
               return (
                 <div
                   key={p.id}
-                  className={`p-2.5 rounded-lg border text-center font-bold transition-all ${
+                  className={`p-2 rounded-lg border text-center font-bold transition-all ${
                     isCurrent
                       ? 'bg-sky-500 text-white border-sky-400 shadow-sm'
                       : 'bg-slate-800/60 text-slate-400 border-slate-700'
@@ -200,7 +248,8 @@ export const ActiveFlightView: React.FC = () => {
                 {flightPhase === 'briefing' && '1. Briefing / Pátio'}
                 {flightPhase === 'taxi' && '2. Táxi'}
                 {flightPhase === 'cruise' && '3. Em Voo'}
-                {flightPhase === 'landed' && '4. Pouso Concluído'}
+                {flightPhase === 'intermediate_landing' && `4. Escala em ${currentLocationIcao || 'Aeroporto Intermediário'}`}
+                {flightPhase === 'landed' && '5. Pouso Final Concluído'}
               </span>
             </div>
 
@@ -208,7 +257,8 @@ export const ActiveFlightView: React.FC = () => {
               {flightPhase === 'briefing' && 'Configure seu plano de voo no MSFS, sintonize as frequências e prepare a aeronave no pátio de partida ou ponto de espera.'}
               {flightPhase === 'taxi' && 'Movimento detectado! Realize o táxi até a pista em uso, solicite autorização e inicie a corrida de decolagem.'}
               {flightPhase === 'cruise' && 'Aeronave em voo! Acompanhe os parâmetros de navegação até o aeroporto de destino.'}
-              {flightPhase === 'landed' && 'Pouso efetuado com sucesso! Realize o táxi até o pátio e efetue o corte dos motores.'}
+              {flightPhase === 'intermediate_landing' && `Aeronave pousada no aeroporto intermediário ${currentLocationIcao || ''}. A posição foi salva. Para prosseguir o voo rumo a ${activeContract.route.arrivalIcao}, decole do simulador.`}
+              {flightPhase === 'landed' && 'Pouso efetuado com sucesso no aeroporto de destino! Realize o táxi até o pátio e efetue o corte dos motores.'}
             </p>
           </div>
 

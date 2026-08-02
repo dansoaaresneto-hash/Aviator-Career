@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const MissionValidationBanner: React.FC = () => {
-  const { activeContract } = usePilot();
+  const { activeContract, currentLocationIcao } = usePilot();
   const {
     telemetry,
     connectionStatus,
@@ -31,7 +31,7 @@ export const MissionValidationBanner: React.FC = () => {
 
   if (!activeContract) return null;
 
-  const validation = validateContract(activeContract);
+  const validation = validateContract(activeContract, currentLocationIcao || undefined);
 
   const renderStatusBadge = (status: ValidationItem['status']) => {
     if (status === 'valid') {
