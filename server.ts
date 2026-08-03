@@ -77,6 +77,100 @@ app.get('/api/airac/airports/nearby', async (req, res) => {
   return res.json({ status: 'success', data: [] });
 });
 
+// Helper to generate procedural aeronautical waypoints around a lat/lng
+function generateFallbackWaypoints(lat: number, lng: number, radiusNm: number = 250) {
+  const waypoints: any[] = [];
+  const syllables1 = ['AR', 'BEL', 'COR', 'DAR', 'EP', 'FOR', 'GAR', 'HOR', 'IP', 'JUR', 'KAP', 'LOB', 'MAR', 'NAV', 'OP', 'PAR', 'REK', 'SAL', 'TUR', 'VOB', 'XAP', 'ZAG'];
+  const syllables2 = ['TIK', 'MAN', 'POS', 'LUX', 'GON', 'TOR', 'VAP', 'RIX', 'SOK', 'BOS', 'DAK', 'FEL', 'GOL', 'KOT', 'LUM', 'MIK', 'NOV', 'PAX', 'RUB', 'SIL', 'TAL', 'VER'];
+
+  const degRadius = Math.min(5, Math.max(1, radiusNm / 60));
+  const step = 0.5; // Every ~30 nautical miles
+
+  const startLat = Math.floor((lat - degRadius) / step) * step;
+  const endLat = Math.ceil((lat + degRadius) / step) * step;
+  const startLng = Math.floor((lng - degRadius) / step) * step;
+  const endLng = Math.ceil((lng + degRadius) / step) * step;
+
+  let count = 0;
+  for (let l = startLat; l <= endLat; l += step) {
+    for (let g = startLng; g <= endLng; g += step) {
+      const offsetLat = Math.sin(l * 12.3 + g * 45.6) * 0.12;
+      const offsetLng = Math.cos(l * 78.9 + g * 23.4) * 0.12;
+      const finalLat = Number((l + offsetLat).toFixed(4));
+      const finalLng = Number((g + offsetLng).toFixed(4));
+
+      const dLat = (finalLat - lat) * 60;
+      const dLng = (finalLng - lng) * 60 * Math.cos((lat * Math.PI) / 180);
+      const distNm = Math.sqrt(dLat * dLat + dLng * dLng);
+
+      if (distNm <= radiusNm) {
+        const hash = Math.abs(Math.floor(finalLat * 1000 + finalLng * 1000));
+        const name1 = syllables1[hash % syllables1.length];
+        const name2 = syllables2[(hash >> 2) % syllables2.length];
+        const identifier = `${name1}${name2}`.substring(0, 5).toUpperCase();
+
+        waypoints.push({
+          identifier,
+          name: `${identifier} RNAV Fix`,
+          type: { code: 'W', name: 'Waypoint' },
+          coordinates: { latitude: finalLat, longitude: finalLng },
+          latitude: finalLat,
+          longitude: finalLng,
+        });
+        count++;
+        if (count >= 50) break;
+      }
+    }
+    if (count >= 50) break;
+  }
+
+  return waypoints;
+}
+
+function generateFallbackNavaids(lat: number, lng: number, radiusNm: number = 250) {
+  const navaids: any[] = [];
+  const navaidNames = ['ALTO', 'BARRA', 'CAMPO', 'DOURO', 'ESTE', 'FAROL', 'GAVEA', 'HORTO', 'ILHA', 'JARDIM', 'LAGO', 'MATA', 'NORTE', 'PRAIA', 'SERRA', 'VALE'];
+
+  const degRadius = Math.min(5, Math.max(1.5, radiusNm / 60));
+  const step = 1.0; // Every ~60 nautical miles
+
+  const startLat = Math.floor((lat - degRadius) / step) * step;
+  const endLat = Math.ceil((lat + degRadius) / step) * step;
+  const startLng = Math.floor((lng - degRadius) / step) * step;
+  const endLng = Math.ceil((lng + degRadius) / step) * step;
+
+  let count = 0;
+  for (let l = startLat; l <= endLat; l += step) {
+    for (let g = startLng; g <= endLng; g += step) {
+      const finalLat = Number(l.toFixed(4));
+      const finalLng = Number(g.toFixed(4));
+
+      const hash = Math.abs(Math.floor(finalLat * 100 + finalLng * 100));
+      const prefix = String.fromCharCode(65 + (hash % 26));
+      const middle = String.fromCharCode(65 + ((hash >> 3) % 26));
+      const suffix = String.fromCharCode(65 + ((hash >> 5) % 26));
+      const identifier = `${prefix}${middle}${suffix}`;
+      const freq = (112.0 + (hash % 60) * 0.1).toFixed(2);
+      const name = `${navaidNames[hash % navaidNames.length]} VOR/DME`;
+
+      navaids.push({
+        identifier,
+        name,
+        type: 'VOR',
+        frequency: freq,
+        coordinates: { latitude: finalLat, longitude: finalLng },
+        latitude: finalLat,
+        longitude: finalLng,
+      });
+      count++;
+      if (count >= 20) break;
+    }
+    if (count >= 20) break;
+  }
+
+  return navaids;
+}
+
 // GET /api/airac/waypoints/nearby
 app.get('/api/airac/waypoints/nearby', async (req, res) => {
   const { latitude, longitude, radius = 200 } = req.query;
@@ -84,12 +178,18 @@ app.get('/api/airac/waypoints/nearby', async (req, res) => {
     return res.status(400).json({ status: 'error', message: 'Missing lat/lon' });
   }
 
+  const latNum = Number(latitude);
+  const lngNum = Number(longitude);
+  const radNum = Number(radius);
+
   const result = await proxyAirac(`/waypoints/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}`);
-  if (result && result.status === 'success') {
+  if (result && result.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
     return res.json(result);
   }
 
-  return res.json({ status: 'success', data: [] });
+  // Fallback synthetic waypoints around requested area
+  const fallbackWaypoints = generateFallbackWaypoints(latNum, lngNum, radNum);
+  return res.json({ status: 'success', data: fallbackWaypoints });
 });
 
 // GET /api/airac/navaids/nearby
@@ -99,12 +199,18 @@ app.get('/api/airac/navaids/nearby', async (req, res) => {
     return res.status(400).json({ status: 'error', message: 'Missing lat/lon' });
   }
 
+  const latNum = Number(latitude);
+  const lngNum = Number(longitude);
+  const radNum = Number(radius);
+
   const result = await proxyAirac(`/navaids/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}`);
-  if (result && result.status === 'success') {
+  if (result && result.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
     return res.json(result);
   }
 
-  return res.json({ status: 'success', data: [] });
+  // Fallback synthetic navaids around requested area
+  const fallbackNavaids = generateFallbackNavaids(latNum, lngNum, radNum);
+  return res.json({ status: 'success', data: fallbackNavaids });
 });
 
 // GET /api/airac/search

@@ -4,9 +4,8 @@ import { calculateDistanceNm } from './aviationNavMath';
 
 // Level of Detail (LOD) Helpers matching AIRAC integration guide Section 8
 export function tierForZoom(zoom: number): number {
-  if (zoom <= 6) return 1;
-  if (zoom <= 9) return 2;
-  if (zoom <= 12) return 3;
+  if (zoom <= 5) return 2;
+  if (zoom <= 8) return 3;
   return 4;
 }
 
@@ -99,9 +98,7 @@ export function navaidTier(navaid: { type: string; tier?: number }): number {
 
 export function waypointTier(wp: { typeCode?: string; tier?: number }): number {
   if (wp.tier) return wp.tier;
-  if (wp.typeCode && ['C', 'R', 'W'].includes(wp.typeCode)) return 2;
-  if (wp.typeCode === 'V') return 3;
-  return 4;
+  return 1;
 }
 
 // Fetch Current AIRAC Cycle
@@ -148,13 +145,17 @@ export async function fetchNearbyFixes(
 
   // 2. Fetch live airports and waypoints from proxy
   try {
-    const [airportsRes, waypointsRes, navaidsRes] = await Promise.all([
+    const results = await Promise.allSettled([
       fetch(`/api/airac/airports/nearby?latitude=${lat}&longitude=${lng}&radius=${radiusNm}`),
       fetch(`/api/airac/waypoints/nearby?latitude=${lat}&longitude=${lng}&radius=${radiusNm}`),
       fetch(`/api/airac/navaids/nearby?latitude=${lat}&longitude=${lng}&radius=${radiusNm}`),
     ]);
 
-    if (airportsRes.ok) {
+    const airportsRes = results[0].status === 'fulfilled' ? results[0].value : null;
+    const waypointsRes = results[1].status === 'fulfilled' ? results[1].value : null;
+    const navaidsRes = results[2].status === 'fulfilled' ? results[2].value : null;
+
+    if (airportsRes && airportsRes.ok) {
       const json = await airportsRes.json();
       if (json.status === 'success' && Array.isArray(json.data)) {
         json.data.forEach((item: any) => {
@@ -191,7 +192,7 @@ export async function fetchNearbyFixes(
       }
     }
 
-    if (navaidsRes.ok) {
+    if (navaidsRes && navaidsRes.ok) {
       const json = await navaidsRes.json();
       if (json.status === 'success' && Array.isArray(json.data)) {
         json.data.forEach((item: any) => {
@@ -213,7 +214,7 @@ export async function fetchNearbyFixes(
       }
     }
 
-    if (waypointsRes.ok) {
+    if (waypointsRes && waypointsRes.ok) {
       const json = await waypointsRes.json();
       if (json.status === 'success' && Array.isArray(json.data)) {
         json.data.forEach((item: any) => {

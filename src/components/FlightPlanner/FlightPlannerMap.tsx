@@ -177,34 +177,58 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
 
   // Filter visible aeronautical fixes based on LOD & layer toggles
   const visibleFixes = useMemo(() => {
-    return allFixes.filter((fix) => {
+    // 1. Ensure all waypoints currently in the flight plan are merged into the fixes map
+    const fixesMap = new Map<string, AeronauticalFix>();
+    allFixes.forEach((fix) => fixesMap.set(fix.identifier, fix));
+
+    waypoints.forEach((wp) => {
+      if (!fixesMap.has(wp.identifier)) {
+        fixesMap.set(wp.identifier, {
+          id: wp.id || `wp-${wp.identifier.toLowerCase()}`,
+          identifier: wp.identifier,
+          name: wp.name || wp.identifier,
+          type: (wp.type === 'airport' || wp.type === 'vor' || wp.type === 'ndb') ? wp.type : 'fix',
+          lat: wp.lat,
+          lng: wp.lng,
+          elevationFt: wp.elevationFt,
+          freq: wp.freq,
+          tier: 1, // High priority for route waypoints
+        });
+      }
+    });
+
+    const combinedFixes = Array.from(fixesMap.values());
+
+    return combinedFixes.filter((fix) => {
       const isRouteFix = waypoints.some((wp) => wp.identifier === fix.identifier);
+
+      // Route waypoints should always be visible regardless of filters/LOD
+      if (isRouteFix) return true;
 
       if (fix.type === 'airport') {
         const isHeli = isHelipadFix(fix);
 
         // Helipads toggle check
-        if (isHeli && !showHelipads && !isRouteFix) return false;
+        if (isHeli && !showHelipads) return false;
 
         // General airports toggle check
-        if (!isHeli && !showAirports && !isRouteFix) return false;
+        if (!isHeli && !showAirports) return false;
 
         // LOD Tier filter
         const tier = airportTier(fix);
-        return isRouteFix || tier <= maxTier;
+        return tier <= maxTier;
       }
 
       if (fix.type === 'vor') {
-        if (!showVors && !isRouteFix) return false;
+        if (!showVors) return false;
         const tier = navaidTier(fix);
-        return isRouteFix || tier <= maxTier;
+        return tier <= maxTier;
       }
 
-      if (fix.type === 'fix') {
-        if (!showWaypoints && !isRouteFix) return false;
-        const tier = waypointTier(fix);
-        return isRouteFix || tier <= maxTier;
-      }
+      // All other fixes (waypoint, RNAV fix, NDB)
+      if (!showWaypoints) return false;
+      const tier = waypointTier(fix);
+      return tier <= maxTier;
 
       return true;
     });
@@ -232,117 +256,78 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
       const isWaypt = waypoints.some((wp) => wp.identifier === fix.identifier);
       const isRouteEndpoint = isOrigin || isDest;
 
-      let customHtml = '';
+      let circleStyle = '';
+      let textColor = '';
 
       if (fix.type === 'airport') {
         const isHeli = isHelipadFix(fix);
 
-        let iconGraphic = '';
         if (isHeli) {
-          iconGraphic = `
-            <div class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-sm shadow-rose-950/30 flex items-center justify-center transition-transform duration-200 group-hover:scale-140">
-              <span class="text-[8px] font-black text-white leading-none select-none">H</span>
-            </div>
-          `;
+          circleStyle = isWaypt
+            ? 'w-2.5 h-2.5 bg-rose-500 ring-2 ring-amber-400 shadow-sm'
+            : 'w-2 h-2 bg-rose-500 shadow-xs opacity-90';
+          textColor = isDarkMap ? 'text-rose-300 font-normal' : 'text-rose-800 font-normal';
         } else {
-          const dotStyle = isOrigin
-            ? 'bg-amber-500 border-2 border-amber-200 shadow-md shadow-amber-500/40 scale-125'
-            : isDest
-            ? 'bg-emerald-500 border-2 border-emerald-200 shadow-md shadow-emerald-500/40 scale-125'
-            : fix.iata
-            ? 'bg-sky-500 shadow-sm shadow-sky-900/30'
-            : 'bg-slate-400 shadow-sm shadow-slate-900/30';
-
-          iconGraphic = `
-            <div class="relative flex items-center justify-center">
-              ${isOrigin ? `<div class="absolute w-5 h-5 rounded-full bg-amber-400/40 animate-ping pointer-events-none"></div>` : ''}
-              ${isDest ? `<div class="absolute w-5 h-5 rounded-full bg-emerald-400/40 animate-ping pointer-events-none"></div>` : ''}
-              <div class="w-3.5 h-3.5 rounded-full ${dotStyle} flex items-center justify-center transition-transform duration-200 group-hover:scale-140">
-                <div class="w-1 h-1 bg-white/90 rounded-full shadow-xs"></div>
-              </div>
-            </div>
-          `;
+          if (isOrigin) {
+            circleStyle = 'w-3 h-3 bg-amber-400 ring-2 ring-amber-300/80 shadow-md shadow-amber-500/30 scale-110';
+            textColor = 'text-amber-500 font-medium';
+          } else if (isDest) {
+            circleStyle = 'w-3 h-3 bg-emerald-400 ring-2 ring-emerald-300/80 shadow-md shadow-emerald-500/30 scale-110';
+            textColor = 'text-emerald-500 font-medium';
+          } else if (isWaypt) {
+            circleStyle = 'w-2.5 h-2.5 bg-amber-400 ring-2 ring-amber-300/80 shadow-xs';
+            textColor = 'text-amber-500 font-medium';
+          } else if (fix.iata) {
+            circleStyle = 'w-2.5 h-2.5 bg-sky-500 shadow-xs opacity-90';
+            textColor = isDarkMap ? 'text-sky-300 font-normal' : 'text-slate-800 font-normal';
+          } else {
+            circleStyle = 'w-2 h-2 bg-slate-400 shadow-xs opacity-80';
+            textColor = isDarkMap ? 'text-slate-300 font-normal' : 'text-slate-700 font-normal';
+          }
         }
-
-        const textColor = isOrigin
-          ? 'text-amber-600 font-black'
-          : isDest
-          ? 'text-emerald-600 font-black'
-          : isHeli
-          ? 'text-rose-400 font-black'
-          : isDarkMap
-          ? 'text-sky-300 font-extrabold'
-          : 'text-slate-950 font-black';
-
-        customHtml = `
-          <div class="relative group flex items-center justify-center cursor-pointer">
-            ${iconGraphic}
-
-            <!-- Plain High-Contrast Text (NO BADGE / NO BACKGROUND BOX) -->
-            <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-0.5 flex flex-col items-center pointer-events-none transition-all duration-200 ${
-              isZoomedIn || isRouteEndpoint || showFixLabels
-                ? 'opacity-100 translate-y-0 scale-100 z-20'
-                : 'opacity-0 translate-y-1 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 z-30'
-            }">
-              <span class="font-mono text-[11px] tracking-tight whitespace-nowrap select-none ${textColor}" style="${textHaloStyle}">
-                ${fix.identifier}
-              </span>
-            </div>
-          </div>
-        `;
       } else if (fix.type === 'vor') {
-        const textColor = isWaypt
-          ? 'text-amber-600 font-black'
-          : isDarkMap
-          ? 'text-indigo-300 font-extrabold'
-          : 'text-indigo-950 font-black';
-
-        customHtml = `
-          <div class="relative group flex items-center justify-center cursor-pointer">
-            <div class="w-3 h-3 bg-indigo-500 rounded-xs rotate-45 shadow-sm shadow-indigo-950/40 flex items-center justify-center transition-transform duration-200 group-hover:scale-140 group-hover:bg-amber-400">
-              <div class="w-1 h-1 bg-amber-300 rounded-full"></div>
-            </div>
-
-            <!-- Plain High-Contrast Text (NO BADGE / NO BACKGROUND BOX) -->
-            <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-0.5 flex flex-col items-center pointer-events-none transition-all duration-200 ${
-              isZoomedIn || isWaypt || showFixLabels
-                ? 'opacity-100 translate-y-0 scale-100 z-20'
-                : 'opacity-0 translate-y-1 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 z-30'
-            }">
-              <span class="font-mono text-[10px] tracking-tight whitespace-nowrap select-none ${textColor}" style="${textHaloStyle}">
-                ${fix.identifier}
-              </span>
-            </div>
-          </div>
-        `;
+        if (isWaypt) {
+          circleStyle = 'w-2.5 h-2.5 bg-amber-400 ring-2 ring-amber-300/80 shadow-xs';
+          textColor = 'text-amber-500 font-medium';
+        } else {
+          circleStyle = 'w-2 h-2 bg-indigo-500 shadow-xs opacity-85';
+          textColor = isDarkMap ? 'text-indigo-300 font-normal' : 'text-indigo-900 font-normal';
+        }
       } else {
         // Waypoint / RNAV Fix
-        const textColor = isWaypt
-          ? 'text-amber-600 font-black'
-          : isDarkMap
-          ? 'text-teal-300 font-extrabold'
-          : 'text-teal-950 font-black';
-
-        customHtml = `
-          <div class="relative group flex items-center justify-center cursor-pointer">
-            <div class="w-2.5 h-2.5 rotate-45 ${
-              isWaypt ? 'bg-amber-400 scale-125 shadow-md shadow-amber-500/40' : 'bg-teal-400 shadow-sm shadow-teal-950/40'
-            } transition-transform duration-200 group-hover:scale-140 group-hover:bg-amber-300">
-            </div>
-
-            <!-- Plain High-Contrast Text (NO BADGE / NO BACKGROUND BOX) -->
-            <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-0.5 flex flex-col items-center pointer-events-none transition-all duration-200 ${
-              isZoomedIn || isWaypt || showFixLabels
-                ? 'opacity-100 translate-y-0 scale-100 z-20'
-                : 'opacity-0 translate-y-1 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 z-30'
-            }">
-              <span class="font-mono text-[10px] tracking-tight whitespace-nowrap select-none ${textColor}" style="${textHaloStyle}">
-                ${fix.identifier}
-              </span>
-            </div>
-          </div>
-        `;
+        if (isWaypt) {
+          circleStyle = 'w-2.5 h-2.5 bg-amber-400 ring-2 ring-amber-300/80 shadow-xs';
+          textColor = 'text-amber-500 font-medium';
+        } else {
+          circleStyle = 'w-2 h-2 bg-teal-400 shadow-xs opacity-80';
+          textColor = isDarkMap ? 'text-teal-300 font-normal' : 'text-teal-900 font-normal';
+        }
       }
+
+      const iconGraphic = `
+        <div class="relative flex items-center justify-center">
+          ${isOrigin ? `<div class="absolute w-4 h-4 rounded-full bg-amber-400/40 animate-ping pointer-events-none"></div>` : ''}
+          ${isDest ? `<div class="absolute w-4 h-4 rounded-full bg-emerald-400/40 animate-ping pointer-events-none"></div>` : ''}
+          <div class="rounded-full ${circleStyle} transition-transform duration-200 group-hover:scale-130"></div>
+        </div>
+      `;
+
+      const customHtml = `
+        <div class="relative group flex items-center justify-center cursor-pointer">
+          ${iconGraphic}
+
+          <!-- Minimalist High-Contrast Label with Thinner Font -->
+          <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-0.5 flex flex-col items-center pointer-events-none transition-all duration-200 ${
+            isZoomedIn || isWaypt || showFixLabels
+              ? 'opacity-100 translate-y-0 scale-100 z-20'
+              : 'opacity-0 translate-y-1 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 z-30'
+          }">
+            <span class="font-mono text-[10px] tracking-tight whitespace-nowrap select-none ${textColor}" style="${textHaloStyle}">
+              ${fix.identifier}
+            </span>
+          </div>
+        </div>
+      `;
 
       const divIcon = L.divIcon({
         html: customHtml,
