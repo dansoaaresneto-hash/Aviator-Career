@@ -4,8 +4,9 @@ import { calculateDistanceNm } from './aviationNavMath';
 
 // Level of Detail (LOD) Helpers matching AIRAC integration guide Section 8
 export function tierForZoom(zoom: number): number {
-  if (zoom <= 5) return 2;
-  if (zoom <= 8) return 3;
+  if (zoom <= 5) return 1;
+  if (zoom <= 7) return 2;
+  if (zoom <= 9) return 3;
   return 4;
 }
 
@@ -93,12 +94,35 @@ export function airportTier(apt: { name?: string; iata?: string; tier?: number; 
 export function navaidTier(navaid: { type: string; tier?: number }): number {
   if (navaid.tier) return navaid.tier;
   const majorTypes = ['VOR', 'VOR/DME', 'VORTAC', 'TACAN'];
-  return majorTypes.includes(navaid.type.toUpperCase()) ? 1 : 3;
+  const typeStr = typeof navaid.type === 'string' ? navaid.type : (navaid.type as any)?.code || '';
+  return majorTypes.includes(typeStr.toUpperCase()) ? 1 : 3;
 }
 
-export function waypointTier(wp: { typeCode?: string; tier?: number }): number {
+export function waypointTier(wp: { typeCode?: string; tier?: number; identifier?: string; type?: string }): number {
   if (wp.tier) return wp.tier;
-  return 1;
+
+  const typeStr = (wp.typeCode || wp.type || '').toUpperCase();
+  const id = (wp.identifier || '').toUpperCase();
+
+  // Compulsory reporting points or high enroute airway fixes -> Tier 2
+  if (typeStr === 'C' || typeStr === 'COMPULSORY' || typeStr === 'HIGH' || typeStr === 'ENROUTE') {
+    return 2;
+  }
+
+  // Major 5-letter ICAO waypoints (e.g., OBOKA, TORNU, PIRUS) -> Tier 2 or Tier 3
+  if (id.length === 5) {
+    if (/^[A-Z]{5}$/.test(id)) {
+      return 2; // High priority enroute RNAV fix
+    }
+    return 3;
+  }
+
+  // Local/Approach/Runway fixes (e.g. RW17, FI27, CF09) or local codes -> Tier 4
+  if (id.startsWith('RW') || id.startsWith('FF') || id.startsWith('FI') || id.startsWith('FD') || id.length <= 4) {
+    return 4;
+  }
+
+  return 3;
 }
 
 // Fetch Current AIRAC Cycle
@@ -207,7 +231,7 @@ export async function fetchNearbyFixes(
               lat: item.coordinates?.latitude || item.latitude || lat,
               lng: item.coordinates?.longitude || item.longitude || lng,
               elevationFt: item.elevation_ft,
-              tier: navaidTier({ type: item.type || 'VOR' }),
+              tier: navaidTier({ type: item.type?.code || item.type || 'VOR' }),
             });
           }
         });
@@ -228,7 +252,7 @@ export async function fetchNearbyFixes(
               typeCode: item.type?.code,
               lat: item.coordinates?.latitude || item.latitude || lat,
               lng: item.coordinates?.longitude || item.longitude || lng,
-              tier: waypointTier({ typeCode: item.type?.code }),
+              tier: waypointTier({ identifier: id, typeCode: item.type?.code || item.type, tier: item.tier }),
             });
           }
         });
