@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Compass,
   Laptop,
-  Radio
+  Radio,
+  Building2
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -31,6 +32,12 @@ export const Sidebar: React.FC = () => {
       label: 'Missões & Voos',
       icon: <PlaneTakeoff className="w-5 h-5" />,
       badge: 'Contratos',
+    },
+    {
+      id: 'admin-companies',
+      label: 'Empresas (Admin)',
+      icon: <Building2 className="w-5 h-5 text-purple-500" />,
+      badge: 'ADMIN',
     },
     {
       id: 'flight-planner',

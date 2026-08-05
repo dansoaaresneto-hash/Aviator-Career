@@ -14,6 +14,7 @@ import { ProfileView } from './components/Profile/ProfileView';
 import { SettingsView } from './components/Settings/SettingsView';
 import { ConnectorView } from './components/Connector/ConnectorView';
 import { LiveRadarView } from './components/LiveRadar/LiveRadarView';
+import { AdminCompaniesView } from './components/Admin/AdminCompaniesView';
 import { AuthScreen } from './components/Auth/AuthScreen';
 import { Plane } from 'lucide-react';
 
@@ -27,6 +28,7 @@ const MainContent: React.FC = () => {
       <div className="min-h-[600px]">
         {activeTab === 'overview' && <Overview />}
         {activeTab === 'missions' && <MissionsView />}
+        {activeTab === 'admin-companies' && <AdminCompaniesView />}
         {activeTab === 'flight-planner' && <FlightPlannerView />}
         {activeTab === 'live-map' && <LiveRadarView />}
         {activeTab === 'active-flight' && <ActiveFlightView />}

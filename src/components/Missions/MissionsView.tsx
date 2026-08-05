@@ -5,7 +5,7 @@ import { MissionCard } from './MissionCard';
 import { MissionDetailModal } from './MissionDetailModal';
 import { FerryMissionModal } from './FerryMissionModal';
 import { Contract } from '../../types';
-import { PlaneTakeoff, SearchX, RefreshCw } from 'lucide-react';
+import { PlaneTakeoff, SearchX, Building2 } from 'lucide-react';
 
 export const MissionsView: React.FC = () => {
   const {
@@ -14,6 +14,7 @@ export const MissionsView: React.FC = () => {
     searchQuery,
     selectedContractForPreview,
     setSelectedContractForPreview,
+    setActiveTab,
   } = usePilot();
 
   // Filter contracts based on tab and search term
@@ -52,9 +53,17 @@ export const MissionsView: React.FC = () => {
             Quadro de Missões & Contratos
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Selecione uma missão para transportar cargas, passageiros ou realizar translados com sua aeronave
+            Missões geradas dinamicamente com base nas regras das empresas ativas no painel Admin.
           </p>
         </div>
+
+        <button
+          onClick={() => setActiveTab('admin-companies')}
+          className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all flex items-center gap-2 shrink-0 cursor-pointer self-start sm:self-auto"
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Gerenciar Empresas (Admin)</span>
+        </button>
       </div>
 
       {/* Filter Bar */}

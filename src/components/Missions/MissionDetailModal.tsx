@@ -2,6 +2,7 @@ import React from 'react';
 import { Contract } from '../../types';
 import { usePilot } from '../../context/PilotContext';
 import { MissionBadge, UrgencyBadge } from '../UI/Badge';
+import { CompanyLogoBadge } from '../Common/CompanyLogoBadge';
 import {
   X,
   Plane,
@@ -35,9 +36,13 @@ export const MissionDetailModal: React.FC<MissionDetailModalProps> = ({ contract
         {/* Modal Header */}
         <div className="p-5 pb-4 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${contract.company.logoColor} text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0`}>
-              <Building2 className="w-5 h-5" />
-            </div>
+            <CompanyLogoBadge
+              logoUrl={contract.company.logoUrl}
+              logoColor={contract.company.logoColor}
+              icaoCode={contract.company.icaoCode}
+              companyName={contract.company.name}
+              size="lg"
+            />
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-bold text-slate-500">{contract.company.name}</span>

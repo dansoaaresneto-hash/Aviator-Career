@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Contract, FlightLog, PilotProfile, ActiveTab } from '../types';
-import { INITIAL_CONTRACTS } from '../data/initialContracts';
+import { Contract, FlightLog, PilotProfile, ActiveTab, AdminCompany } from '../types';
+import { INITIAL_ADMIN_COMPANIES } from '../data/initialCompanies';
+import { generateContractsFromCompanies } from '../utils/missionGenerator';
 import { useTelemetry } from './TelemetryContext';
 
 interface PilotContextType {
@@ -30,6 +31,12 @@ interface PilotContextType {
   setSearchQuery: (query: string) => void;
   selectedAircraftFilter: string;
   setSelectedAircraftFilter: (aircraft: string) => void;
+  // Admin Company Management
+  adminCompanies: AdminCompany[];
+  saveCompany: (company: AdminCompany) => void;
+  deleteCompany: (companyId: string) => void;
+  toggleCompanyActive: (companyId: string) => void;
+  regenerateMissions: () => void;
 }
 
 const INITIAL_PROFILE: PilotProfile = {
@@ -61,7 +68,53 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_PROFILE;
   });
 
-  const [contracts, setContracts] = useState<Contract[]>(INITIAL_CONTRACTS);
+  const [adminCompanies, setAdminCompanies] = useState<AdminCompany[]>(() => {
+    const saved = localStorage.getItem('aviator_admin_companies');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return INITIAL_ADMIN_COMPANIES;
+  });
+
+  const [contracts, setContracts] = useState<Contract[]>(() => {
+    return generateContractsFromCompanies(adminCompanies);
+  });
+
+  // Automatically update contracts whenever adminCompanies change
+  useEffect(() => {
+    localStorage.setItem('aviator_admin_companies', JSON.stringify(adminCompanies));
+    setContracts(generateContractsFromCompanies(adminCompanies));
+  }, [adminCompanies]);
+
+  const saveCompany = (company: AdminCompany) => {
+    setAdminCompanies((prev) => {
+      const existingIdx = prev.findIndex((c) => c.id === company.id);
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        copy[existingIdx] = company;
+        return copy;
+      }
+      return [company, ...prev];
+    });
+  };
+
+  const deleteCompany = (companyId: string) => {
+    setAdminCompanies((prev) => prev.filter((c) => c.id !== companyId));
+  };
+
+  const toggleCompanyActive = (companyId: string) => {
+    setAdminCompanies((prev) =>
+      prev.map((c) => (c.id === companyId ? { ...c, isActive: !c.isActive } : c))
+    );
+  };
+
+  const regenerateMissions = () => {
+    setContracts(generateContractsFromCompanies(adminCompanies));
+  };
   const [activeContract, setActiveContract] = useState<Contract | null>(() => {
     const saved = localStorage.getItem('aviator_active_contract');
     return saved ? JSON.parse(saved) : null;
@@ -203,7 +256,8 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     else if (flightPhase === 'cruise') {
       if (onGround) {
         // Aircraft touched down! Check if touchdown airport matches destination
-        const currentLandedIcao = (telemetry.airportIcao || '').trim().toUpperCase();
+        const rawIcao = (telemetry.airportIcao || '').trim().toUpperCase();
+        const currentLandedIcao = (rawIcao && rawIcao !== '---') ? rawIcao : '';
         const targetArrivalIcao = (activeContract.route.arrivalIcao || '').trim().toUpperCase();
 
         if (currentLandedIcao && currentLandedIcao === targetArrivalIcao) {
@@ -237,6 +291,12 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Cruise progress smoothly advances up to 95%
         const cruiseBonus = Math.min(35, Math.round((speed / 180) * 35));
         setFlightProgress((prev) => Math.max(prev, Math.min(95, 60 + cruiseBonus)));
+      }
+    } else if (flightPhase === 'intermediate_landing' && onGround) {
+      // While on ground at intermediate landing, capture and persist exact landed airport ICAO if detected
+      const rawIcao = (telemetry.airportIcao || '').trim().toUpperCase();
+      if (rawIcao && rawIcao !== '---' && rawIcao !== currentLocationIcao) {
+        setCurrentLocationIcao(rawIcao);
       }
     }
   }, [telemetry, connectionStatus, activeContract, flightPhase, currentLocationIcao]);
@@ -385,7 +445,8 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const resetCareerData = () => {
     setProfile(INITIAL_PROFILE);
-    setContracts(INITIAL_CONTRACTS);
+    setAdminCompanies(INITIAL_ADMIN_COMPANIES);
+    setContracts(generateContractsFromCompanies(INITIAL_ADMIN_COMPANIES));
     setActiveContract(null);
     setFlightPhase(null);
     setFlightProgress(0);
@@ -393,6 +454,7 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIntermediateStops([]);
     setLogbook([]);
     localStorage.removeItem('aviator_pilot_profile');
+    localStorage.removeItem('aviator_admin_companies');
     localStorage.removeItem('aviator_active_contract');
     localStorage.removeItem('aviator_flight_phase');
     localStorage.removeItem('aviator_flight_progress');
@@ -431,6 +493,11 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setSearchQuery,
         selectedAircraftFilter,
         setSelectedAircraftFilter,
+        adminCompanies,
+        saveCompany,
+        deleteCompany,
+        toggleCompanyActive,
+        regenerateMissions,
       }}
     >
       {children}

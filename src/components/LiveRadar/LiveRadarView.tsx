@@ -303,18 +303,14 @@ export const LiveRadarView: React.FC = () => {
                       {pilot.aircraftTitle || 'Aeronave Desconhecida'}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-[10px] pt-2 border-t border-slate-200/60 text-slate-600">
+                    <div className="flex items-center justify-between text-[10px] pt-2 border-t border-slate-200/60 text-slate-600">
                       <div>
-                        <div className="text-slate-400 font-bold uppercase">Aeroporto</div>
-                        <div className="font-bold text-sky-700 font-mono">{pilot.airportIcao || '---'}</div>
+                        <span className="text-slate-400 font-bold uppercase mr-1.5">Aeroporto:</span>
+                        <span className="font-bold text-sky-700 font-mono">{pilot.airportIcao || '---'}</span>
                       </div>
                       <div>
-                        <div className="text-slate-400 font-bold uppercase">Altitude</div>
-                        <div className="font-bold font-mono">{Math.round(pilot.altitudeFt)} ft</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-400 font-bold uppercase">Velocidade</div>
-                        <div className="font-bold font-mono">{Math.round(pilot.groundSpeedKts)} kts</div>
+                        <span className="text-slate-400 font-bold uppercase mr-1.5">Aeronave:</span>
+                        <span className="font-bold text-slate-700">{pilot.aircraftTitle || '---'}</span>
                       </div>
                     </div>
                   </div>

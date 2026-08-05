@@ -8,30 +8,25 @@ import {
   AlertTriangle,
   Radio,
   Download,
-  Play,
-  RotateCcw,
   Plane,
   Scale,
   MapPin,
   HelpCircle,
-  ExternalLink,
-  Sparkles
+  ExternalLink
 } from 'lucide-react';
 
 export const MissionValidationBanner: React.FC = () => {
-  const { activeContract, currentLocationIcao } = usePilot();
+  const { activeContract, currentLocationIcao, flightPhase } = usePilot();
   const {
     telemetry,
     connectionStatus,
     validateContract,
-    setShowConnectorModal,
-    startVirtualSimulation,
-    stopVirtualSimulation,
+    setShowConnectorModal
   } = useTelemetry();
 
   if (!activeContract) return null;
 
-  const validation = validateContract(activeContract, currentLocationIcao || undefined);
+  const validation = validateContract(activeContract, currentLocationIcao || undefined, flightPhase || undefined);
 
   const renderStatusBadge = (status: ValidationItem['status']) => {
     if (status === 'valid') {
@@ -78,12 +73,7 @@ export const MissionValidationBanner: React.FC = () => {
             </span>
             {connectionStatus === 'connected' && (
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                MSFS 2020 Conectado
-              </span>
-            )}
-            {connectionStatus === 'simulated' && (
-              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-indigo-500" /> Modo Teste Virtual
+                MSFS Conectado
               </span>
             )}
             {connectionStatus === 'disconnected' && (
@@ -102,50 +92,13 @@ export const MissionValidationBanner: React.FC = () => {
 
         {/* Quick Connection Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {connectionStatus === 'disconnected' ? (
-            <>
-              <button
-                onClick={() =>
-                  startVirtualSimulation({
-                    airport: activeContract.route.departureIcao,
-                    aircraft: activeContract.requiredAircraft,
-                    payloadKg: 380,
-                  })
-                }
-                className="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-2 rounded-lg border border-indigo-200 transition-all cursor-pointer"
-                title="Simular conexão no navegador para testar sem abrir o MSFS"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Testar Sem MSFS</span>
-              </button>
-
-              <button
-                onClick={() => setShowConnectorModal(true)}
-                className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Conectar Simulador</span>
-              </button>
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowConnectorModal(true)}
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition-all cursor-pointer"
-              >
-                Ver Detalhes da Conexão
-              </button>
-              {connectionStatus === 'simulated' && (
-                <button
-                  onClick={stopVirtualSimulation}
-                  className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-2 rounded-lg border border-red-200 transition-all cursor-pointer"
-                  title="Parar teste virtual"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          )}
+          <button
+            onClick={() => setShowConnectorModal(true)}
+            className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Conectar Simulador</span>
+          </button>
         </div>
       </div>
 

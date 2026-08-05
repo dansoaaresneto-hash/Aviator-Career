@@ -20,6 +20,8 @@ export interface ContractCompany {
   name: string;
   logoColor: string;
   tagline: string;
+  logoUrl?: string;
+  icaoCode?: string;
 }
 
 export interface FerryDossier {
@@ -111,8 +113,9 @@ export interface PilotProfile {
   preferredCallsign: string;
 }
 
-export type ActiveTab = 'overview' | 'missions' | 'active-flight' | 'flight-planner' | 'live-map' | 'fleet' | 'logbook' | 'profile' | 'settings' | 'connector';
+export type ActiveTab = 'overview' | 'missions' | 'active-flight' | 'flight-planner' | 'live-map' | 'fleet' | 'logbook' | 'profile' | 'settings' | 'connector' | 'admin-companies';
 
+export * from './companyAdmin';
 export * from './telemetry';
 
 export interface FlightPlanWaypoint {

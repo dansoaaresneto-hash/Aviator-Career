@@ -1,6 +1,7 @@
 import React from 'react';
 import { Contract } from '../../types';
 import { MissionBadge } from '../UI/Badge';
+import { CompanyLogoBadge } from '../Common/CompanyLogoBadge';
 import {
   Coins,
   Navigation,
@@ -23,9 +24,13 @@ export const MissionCard: React.FC<MissionCardProps> = ({ contract, onSelect }) 
         {/* Top Bar: Contracting Company & Badge */}
         <div className="flex items-center justify-between gap-3 mb-3.5 pt-1">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${contract.company.logoColor} text-white flex items-center justify-center font-bold text-xs shadow-sm shrink-0`}>
-              <Building2 className="w-4 h-4" />
-            </div>
+            <CompanyLogoBadge
+              logoUrl={contract.company.logoUrl}
+              logoColor={contract.company.logoColor}
+              icaoCode={contract.company.icaoCode}
+              companyName={contract.company.name}
+              size="sm"
+            />
             <div className="min-w-0">
               <h4 className="text-xs font-bold text-slate-800 leading-tight truncate">{contract.company.name}</h4>
               <p className="text-[10px] text-slate-400 font-medium truncate">{contract.company.tagline}</p>

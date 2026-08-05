@@ -12,7 +12,7 @@ interface TelemetryContextType {
   updateTelemetry: (data: Partial<SimTelemetryData>) => void;
   startVirtualSimulation: (preset?: { airport?: string; aircraft?: string; payloadKg?: number }) => void;
   stopVirtualSimulation: () => void;
-  validateContract: (contract: Contract | null, expectedOriginIcao?: string) => MissionValidationResult;
+  validateContract: (contract: Contract | null, expectedOriginIcao?: string, currentFlightPhase?: string) => MissionValidationResult;
   isPolling: boolean;
   setIsPolling: (polling: boolean) => void;
 }
@@ -157,7 +157,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Mission validation algorithm
   const validateContract = useCallback(
-    (contract: Contract | null, expectedOriginIcao?: string): MissionValidationResult => {
+    (contract: Contract | null, expectedOriginIcao?: string, currentFlightPhase?: string): MissionValidationResult => {
       if (!contract) {
         return {
           overallStatus: 'pending',
@@ -192,6 +192,11 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const requiredOrigin = (expectedOriginIcao || contract.route.departureIcao || '').trim().toUpperCase();
       const isIntermediate = Boolean(expectedOriginIcao && expectedOriginIcao !== contract.route.departureIcao);
+
+      // Check if flight is airborne or in progress
+      const isAirborne = !telemetry.onGround || Number(telemetry.altitudeFt) > 150 || Number(telemetry.groundSpeedKts) > 35;
+      const isInFlightPhase = currentFlightPhase === 'cruise' || currentFlightPhase === 'approach' || (currentFlightPhase === 'taxi' && !telemetry.onGround);
+      const isFlightInProgress = isAirborne || isInFlightPhase;
 
       if (connectionStatus === 'disconnected' && !telemetry.connected) {
         return {
@@ -233,7 +238,12 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       let airportStatus: ValidationStatus = 'invalid';
       let airportMsg = '';
 
-      if (currentAirport === requiredOrigin) {
+      if (isFlightInProgress) {
+        airportStatus = 'valid';
+        airportMsg = isIntermediate
+          ? `Voo em andamento: decolagem efetuada da posição salva (${requiredOrigin}) rumo ao destino (${contract.route.arrivalIcao}).`
+          : `Voo em andamento: decolagem efetuada do aeroporto de origem (${requiredOrigin}) com destino a ${contract.route.arrivalIcao}.`;
+      } else if (currentAirport === requiredOrigin) {
         airportStatus = 'valid';
         airportMsg = isIntermediate
           ? `Localização confirmada na posição atual/escala (${requiredOrigin}). Decolagem autorizada rumo ao destino final (${contract.route.arrivalIcao}).`
@@ -295,7 +305,10 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const actualPayload = telemetry.payloadKg || 0;
       const diffKg = Math.abs(actualPayload - expectedPayloadKg);
 
-      if (actualPayload === 0 && expectedPayloadKg > 0) {
+      if (isFlightInProgress && actualPayload > 0) {
+        weightStatus = 'valid';
+        weightMsg = `Carga e passageiros validados em voo (${actualPayload} kg embarcados em ${requiredOrigin}).`;
+      } else if (actualPayload === 0 && expectedPayloadKg > 0) {
         weightStatus = 'invalid';
         weightMsg = `A aeronave está sem carga/passageiros no MSFS. Adicione ~${expectedPayloadKg} kg no menu do simulador.`;
       } else if (diffKg <= 80) {
@@ -318,7 +331,11 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       let canDepart = false;
       let summaryText = '';
 
-      if (isAllValid) {
+      if (isFlightInProgress && (aircraftStatus === 'valid' || aircraftStatus === 'warning')) {
+        overallStatus = aircraftStatus === 'warning' ? 'warning' : 'approved';
+        canDepart = true;
+        summaryText = `🟢 Voo em andamento! Perna ativa: ${requiredOrigin} ➔ ${contract.route.arrivalIcao}. Telemetria sendo monitorada.`;
+      } else if (isAllValid) {
         overallStatus = aircraftStatus === 'warning' || weightStatus === 'warning' ? 'warning' : 'approved';
         canDepart = true;
         summaryText = '🟢 Voo validado com sucesso! Sua aeronave e aeroporto correspondem à missão.';
@@ -334,10 +351,14 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         summaryText,
         airportCheck: {
           key: 'airport',
-          title: 'Aeroporto de Origem',
+          title: isIntermediate ? 'Perna / Posição Atual' : 'Aeroporto de Origem',
           status: airportStatus,
-          currentValue: currentAirport || 'Indefinido',
-          requiredValue: `${contract.route.departureIcao} (${contract.route.departureCity})`,
+          currentValue: isFlightInProgress
+            ? (currentAirport ? `${currentAirport} (Em Voo)` : `Em Voo (Decolou de ${requiredOrigin})`)
+            : (currentAirport || 'Indefinido'),
+          requiredValue: isIntermediate
+            ? `${requiredOrigin} (Perna p/ ${contract.route.arrivalIcao})`
+            : `${contract.route.departureIcao} (${contract.route.departureCity})`,
           message: airportMsg,
         },
         aircraftCheck: {

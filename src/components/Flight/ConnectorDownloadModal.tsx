@@ -7,9 +7,6 @@ import {
   Copy,
   Check,
   Radio,
-  Play,
-  RotateCcw,
-  Sparkles,
   HelpCircle,
   Laptop,
   CheckCircle2,
@@ -25,12 +22,10 @@ export const ConnectorDownloadModal: React.FC = () => {
     regenerateToken,
     connectionStatus,
     telemetry,
-    startVirtualSimulation,
-    stopVirtualSimulation,
   } = useTelemetry();
 
   const [copiedToken, setCopiedToken] = useState(false);
-  const [activeTab, setActiveTab] = useState<'download' | 'instructions' | 'test'>('download');
+  const [activeTab, setActiveTab] = useState<'download' | 'instructions'>('download');
 
   if (!showConnectorModal) return null;
 
@@ -88,12 +83,6 @@ export const ConnectorDownloadModal: React.FC = () => {
                 CONECTADO AO MSFS
               </span>
             )}
-            {connectionStatus === 'simulated' && (
-              <span className="inline-flex items-center gap-1.5 font-extrabold text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-300">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                MODO TESTE VIRTUAL
-              </span>
-            )}
             {connectionStatus === 'disconnected' && (
               <span className="inline-flex items-center gap-1.5 font-bold text-slate-600 bg-slate-200 px-2.5 py-1 rounded-md border border-slate-300">
                 <Radio className="w-3.5 h-3.5 text-slate-400 animate-pulse" />
@@ -137,16 +126,6 @@ export const ConnectorDownloadModal: React.FC = () => {
             }`}
           >
             2. Passo a Passo Simples
-          </button>
-          <button
-            onClick={() => setActiveTab('test')}
-            className={`pb-3 border-b-2 transition-all cursor-pointer ${
-              activeTab === 'test'
-                ? 'border-sky-600 text-sky-600 font-extrabold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            3. Testar no Navegador
           </button>
         </div>
 
@@ -257,60 +236,6 @@ export const ConnectorDownloadModal: React.FC = () => {
                       Uma janela preta do terminal irá abrir e confirmar a conexão com a mensagem <span className="text-emerald-700 font-bold">"✅ Conectado com sucesso ao Microsoft Flight Simulator"</span>. O aplicativo no navegador passará automaticamente para o status Conectado!
                     </p>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: TEST IN BROWSER */}
-          {activeTab === 'test' && (
-            <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 leading-relaxed">
-                <h4 className="font-bold mb-1 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  Modo de Demonstração e Teste Rápido
-                </h4>
-                <p>
-                  Ainda não abriu o Flight Simulator ou quer testar a validação das missões direto no navegador? Ative o <strong>Simulador Virtual</strong> abaixo para testar a validação em tempo real!
-                </p>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-700">Simulador de Testes Integrado</span>
-                  {connectionStatus === 'simulated' ? (
-                    <span className="text-emerald-700 font-extrabold flex items-center gap-1">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Teste Ativo
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">Inativo</span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {connectionStatus !== 'simulated' ? (
-                    <button
-                      onClick={() =>
-                        startVirtualSimulation({
-                          airport: 'SBGR',
-                          aircraft: 'Cessna 172 Skyhawk G1000',
-                          payloadKg: 380,
-                        })
-                      }
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 px-4 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Play className="w-4 h-4" />
-                      <span>Ativar Simulador Virtual (SBGR - C172)</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={stopVirtualSimulation}
-                      className="w-full bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-2.5 px-4 rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      <span>Desativar Simulador Virtual</span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

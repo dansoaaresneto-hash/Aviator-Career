@@ -301,9 +301,7 @@ export const LiveRadarMap: React.FC<LiveRadarMapProps> = ({
             ${pilot.aircraftTitle || 'Aeronave'} • <span class="text-slate-400">${categoryLabelMap[category]}</span>
           </div>
           <div class="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 pt-0.5">
-            <span class="${pilot.onGround ? 'text-amber-400 font-bold' : 'text-emerald-400'}">${pilot.onGround ? 'No Solo' : `${Math.round(pilot.altitudeFt)} ft`}</span>
-            <span>•</span>
-            <span>${Math.round(pilot.groundSpeedKts)} kts</span>
+            <span class="${pilot.onGround ? 'text-amber-400 font-bold' : 'text-emerald-400'}">${pilot.onGround ? 'No Solo' : 'Em Voo'}</span>
             ${pilot.airportIcao ? `<span>•</span> <span class="text-sky-300 font-bold">${pilot.airportIcao}</span>` : ''}
           </div>
         </div>
@@ -344,14 +342,6 @@ export const LiveRadarMap: React.FC<LiveRadarMapProps> = ({
             <div class="flex justify-between">
               <span class="text-slate-500">Aeroporto:</span>
               <span class="font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-200">${pilot.airportIcao || '---'}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-slate-500">Altitude:</span>
-              <span class="font-mono font-bold text-slate-800">${Math.round(pilot.altitudeFt)} ft</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-slate-500">Velocidade:</span>
-              <span class="font-mono font-bold text-slate-800">${Math.round(pilot.groundSpeedKts)} kts</span>
             </div>
           </div>
         </div>
