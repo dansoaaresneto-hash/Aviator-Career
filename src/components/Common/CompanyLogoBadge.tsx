@@ -8,6 +8,7 @@ interface CompanyLogoBadgeProps {
   companyName?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  objectFit?: 'contain' | 'cover';
 }
 
 export const CompanyLogoBadge: React.FC<CompanyLogoBadgeProps> = ({
@@ -17,29 +18,26 @@ export const CompanyLogoBadge: React.FC<CompanyLogoBadgeProps> = ({
   companyName,
   size = 'md',
   className = '',
+  objectFit = 'contain',
 }) => {
   const [imageError, setImageError] = useState(false);
 
-  // Define size classes matching rectangular aspect ratios (approx 2.5:1 to 3:1)
+  // Define size classes with rectangular aspect ratio. For images, no border or padding is applied.
   const sizeStyles = {
     sm: {
-      container: 'w-16 h-7 rounded-md text-[10px]',
-      padding: 'p-1',
-      icon: 'w-3 h-3',
-    },
-    md: {
-      container: 'w-24 h-9 rounded-lg text-xs',
-      padding: 'p-1.5',
+      container: 'w-20 h-8 text-[10px]',
       icon: 'w-3.5 h-3.5',
     },
+    md: {
+      container: 'w-28 h-10 text-xs',
+      icon: 'w-4 h-4',
+    },
     lg: {
-      container: 'w-32 h-11 rounded-xl text-xs',
-      padding: 'p-2',
+      container: 'w-36 h-12 text-xs',
       icon: 'w-4 h-4',
     },
     xl: {
-      container: 'w-44 h-16 rounded-xl text-sm',
-      padding: 'p-2.5',
+      container: 'w-48 h-16 text-sm',
       icon: 'w-5 h-5',
     },
   }[size];
@@ -48,10 +46,10 @@ export const CompanyLogoBadge: React.FC<CompanyLogoBadgeProps> = ({
 
   return (
     <div
-      className={`relative shrink-0 flex items-center justify-center overflow-hidden transition-all shadow-xs border ${
+      className={`relative shrink-0 flex items-center justify-start overflow-hidden transition-all ${
         hasImage
-          ? 'bg-slate-900/90 border-slate-700/70'
-          : `bg-gradient-to-r ${logoColor} border-white/20 text-white`
+          ? 'bg-transparent border-0 shadow-none'
+          : `bg-gradient-to-r ${logoColor} rounded-lg shadow-2xs text-white justify-center`
       } ${sizeStyles.container} ${className}`}
       title={companyName || icaoCode || 'Logotipo da Empresa'}
     >
@@ -60,7 +58,9 @@ export const CompanyLogoBadge: React.FC<CompanyLogoBadgeProps> = ({
           src={logoUrl}
           alt={companyName || icaoCode || 'Logo'}
           onError={() => setImageError(true)}
-          className={`w-full h-full object-contain ${sizeStyles.padding}`}
+          className={`w-full h-full ${
+            objectFit === 'cover' ? 'object-cover' : 'object-contain object-center'
+          } p-0`}
         />
       ) : (
         <div className="flex items-center justify-center gap-1.5 px-2 font-black tracking-wider text-white">
@@ -73,3 +73,4 @@ export const CompanyLogoBadge: React.FC<CompanyLogoBadgeProps> = ({
     </div>
   );
 };
+

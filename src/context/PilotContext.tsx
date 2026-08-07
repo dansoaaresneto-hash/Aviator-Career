@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Contract, FlightLog, PilotProfile, ActiveTab, AdminCompany } from '../types';
+import { Contract, FlightLog, PilotProfile, ActiveTab, AdminCompany, AircraftModel } from '../types';
 import { INITIAL_ADMIN_COMPANIES } from '../data/initialCompanies';
+import { AIRCRAFT_CATALOG } from '../data/initialFleet';
 import { generateContractsFromCompanies } from '../utils/missionGenerator';
 import { useTelemetry } from './TelemetryContext';
 
@@ -37,6 +38,11 @@ interface PilotContextType {
   deleteCompany: (companyId: string) => void;
   toggleCompanyActive: (companyId: string) => void;
   regenerateMissions: () => void;
+  // Admin Aircraft Management
+  adminAircrafts: AircraftModel[];
+  saveAircraft: (aircraft: AircraftModel) => void;
+  deleteAircraft: (aircraftId: string) => void;
+  toggleAircraftActive: (aircraftId: string) => void;
 }
 
 const INITIAL_PROFILE: PilotProfile = {
@@ -114,6 +120,44 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const regenerateMissions = () => {
     setContracts(generateContractsFromCompanies(adminCompanies));
+  };
+
+  const [adminAircrafts, setAdminAircrafts] = useState<AircraftModel[]>(() => {
+    const saved = localStorage.getItem('aviator_admin_aircrafts');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return AIRCRAFT_CATALOG;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('aviator_admin_aircrafts', JSON.stringify(adminAircrafts));
+  }, [adminAircrafts]);
+
+  const saveAircraft = (aircraft: AircraftModel) => {
+    setAdminAircrafts((prev) => {
+      const existingIdx = prev.findIndex((a) => a.id === aircraft.id);
+      if (existingIdx >= 0) {
+        const copy = [...prev];
+        copy[existingIdx] = aircraft;
+        return copy;
+      }
+      return [aircraft, ...prev];
+    });
+  };
+
+  const deleteAircraft = (aircraftId: string) => {
+    setAdminAircrafts((prev) => prev.filter((a) => a.id !== aircraftId));
+  };
+
+  const toggleAircraftActive = (aircraftId: string) => {
+    setAdminAircrafts((prev) =>
+      prev.map((a) => (a.id === aircraftId ? { ...a, isActive: a.isActive === false ? true : false } : a))
+    );
   };
   const [activeContract, setActiveContract] = useState<Contract | null>(() => {
     const saved = localStorage.getItem('aviator_active_contract');
@@ -498,6 +542,10 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteCompany,
         toggleCompanyActive,
         regenerateMissions,
+        adminAircrafts,
+        saveAircraft,
+        deleteAircraft,
+        toggleAircraftActive,
       }}
     >
       {children}

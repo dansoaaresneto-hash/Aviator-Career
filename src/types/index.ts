@@ -87,17 +87,25 @@ export interface FlightLog {
 
 export interface AircraftModel {
   id: string;
-  name: string;
-  category: string;
-  manufacturer: string;
-  cruisingSpeedKts: number;
-  rangeNm: number;
-  passengerCapacity: number;
-  cargoCapacityKg: number;
-  rentalFeePerFlight: number;
-  purchasePrice: number;
-  imagePlaceholderColor: string;
-  description: string;
+  name: string; // Modelo / Fabricante (Ex: Cessna 172 Skyhawk)
+  manufacturer: string; // Fabricante (Ex: Cessna)
+  icaoCode: string; // Código ICAO (Ex: C172, B350, A20N)
+  category: string; // Categoria/Tipo (Ex: Monomotor a Pistão, Turboélice, Jato Executivo, etc.)
+  maxFuelGallons: number; // Capacidade Máxima de Combustível
+  passengerCapacity: number; // Quantidade de Passageiros (sem considerar o Piloto)
+  oewKg: number; // Peso Vazio (Operating Empty Weight - OEW em kg)
+  mtowKg: number; // Peso Máximo de Decolagem (MTOW em kg)
+  maxPayloadKg: number; // Carga Útil Máxima (Max Payload em kg)
+  imageUrl?: string; // Foto/Imagem da aeronave (URL)
+  cruisingSpeedKts?: number; // Velocidade de Cruzeiro (kts)
+  rangeNm?: number; // Alcance máximo (NM)
+  cargoCapacityKg?: number; // Capacidade de Carga em kg
+  rentalFeePerFlight?: number; // Taxa de aluguel por voo em CR
+  purchasePrice?: number; // Preço de compra em CR
+  imagePlaceholderColor?: string; // Tailwind color theme for badge/fallback
+  description?: string; // Descrição técnica
+  isActive?: boolean; // Status ativo/inativo
+  createdAt?: string;
 }
 
 export interface PilotProfile {

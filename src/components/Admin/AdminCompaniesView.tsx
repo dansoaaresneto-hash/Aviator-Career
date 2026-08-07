@@ -3,6 +3,7 @@ import { usePilot } from '../../context/PilotContext';
 import { AdminCompany } from '../../types';
 import { CompanyCard } from './CompanyCard';
 import { CompanyModal } from './CompanyModal';
+import { AdminAircraftsView } from './AdminAircraftsView';
 import {
   Building2,
   Plus,
@@ -15,7 +16,8 @@ import {
   CheckCircle2,
   ShieldCheck,
   PlaneTakeoff,
-  Layers
+  Layers,
+  Plane,
 } from 'lucide-react';
 
 export const AdminCompaniesView: React.FC = () => {
@@ -26,7 +28,10 @@ export const AdminCompaniesView: React.FC = () => {
     toggleCompanyActive,
     regenerateMissions,
     contracts,
+    adminAircrafts,
   } = usePilot();
+
+  const [activeAdminTab, setActiveAdminTab] = useState<'companies' | 'aircrafts'>('companies');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
@@ -68,43 +73,99 @@ export const AdminCompaniesView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-400 text-xs font-bold">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Painel de Administração do Sistema</span>
-            </div>
-            <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <Building2 className="w-7 h-7 text-sky-400" />
-              Gerenciamento de Empresas Fictícias
-            </h1>
-            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed font-normal">
-              Cadastre e gerencie empresas fictícias, configure seus logotipos, níveis mínimos exigidos de piloto, tipos de missão oferecidos e regras de atuação regional de rotas.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={handleRegenerate}
-              disabled={isRegenerating}
-              className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+      {/* Top Admin Sub-navigation Tabs */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-2 shadow-2xs flex items-center justify-between gap-2 overflow-x-auto">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveAdminTab('companies')}
+            className={`px-5 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+              activeAdminTab === 'companies'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Empresas Fictícias</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                activeAdminTab === 'companies'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-700'
+              }`}
             >
-              <RefreshCw className={`w-4 h-4 text-sky-400 ${isRegenerating ? 'animate-spin' : ''}`} />
-              <span>Regerar Missões Ativas</span>
-            </button>
+              {adminCompanies.length}
+            </span>
+          </button>
 
-            <button
-              onClick={handleCreateNew}
-              className="bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-sky-600/20 transition-all flex items-center gap-2 cursor-pointer"
+          <button
+            onClick={() => setActiveAdminTab('aircrafts')}
+            className={`px-5 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+              activeAdminTab === 'aircrafts'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Plane className="w-4 h-4" />
+            <span>Gestão de Aeronaves</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                activeAdminTab === 'aircrafts'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-700'
+              }`}
             >
-              <Plus className="w-4.5 h-4.5" />
-              <span>Cadastrar Nova Empresa</span>
-            </button>
-          </div>
+              {adminAircrafts.length}
+            </span>
+          </button>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 pr-2 text-slate-400 text-xs font-semibold">
+          <ShieldCheck className="w-4 h-4 text-sky-500" />
+          <span>Painel de Controle Admin</span>
         </div>
       </div>
+
+      {activeAdminTab === 'aircrafts' ? (
+        <AdminAircraftsView />
+      ) : (
+        <>
+          {/* Top Header Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 relative overflow-hidden">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-400 text-xs font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Painel de Administração do Sistema</span>
+                </div>
+                <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+                  <Building2 className="w-7 h-7 text-sky-400" />
+                  Gerenciamento de Empresas Fictícias
+                </h1>
+                <p className="text-xs text-slate-300 max-w-2xl leading-relaxed font-normal">
+                  Cadastre e gerencie empresas fictícias, configure seus logotipos, níveis mínimos exigidos de piloto, tipos de missão oferecidos e regras de atuação regional de rotas.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <button
+                  onClick={handleRegenerate}
+                  disabled={isRegenerating}
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className={`w-4 h-4 text-sky-400 ${isRegenerating ? 'animate-spin' : ''}`} />
+                  <span>Regerar Missões Ativas</span>
+                </button>
+
+                <button
+                  onClick={handleCreateNew}
+                  className="bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-sky-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4.5 h-4.5" />
+                  <span>Cadastrar Nova Empresa</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
       {/* Metrics Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -250,6 +311,8 @@ export const AdminCompaniesView: React.FC = () => {
         onSave={saveCompany}
         editingCompany={editingCompany}
       />
+        </>
+      )}
     </div>
   );
 };

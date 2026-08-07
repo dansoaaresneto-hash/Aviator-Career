@@ -35,7 +35,7 @@ export const Sidebar: React.FC = () => {
     },
     {
       id: 'admin-companies',
-      label: 'Empresas (Admin)',
+      label: 'Empresas & Aeronaves',
       icon: <Building2 className="w-5 h-5 text-purple-500" />,
       badge: 'ADMIN',
     },

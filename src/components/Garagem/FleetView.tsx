@@ -1,8 +1,11 @@
 import React from 'react';
-import { AIRCRAFT_CATALOG } from '../../data/initialFleet';
-import { Warehouse, Gauge, Navigation, Users, Package, Coins, CheckCircle, Info } from 'lucide-react';
+import { usePilot } from '../../context/PilotContext';
+import { Warehouse, Gauge, Navigation, Users, Package, Coins, Info, Fuel, Weight } from 'lucide-react';
 
 export const FleetView: React.FC = () => {
+  const { adminAircrafts } = usePilot();
+  const activeFleet = adminAircrafts.filter((a) => a.isActive !== false);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -25,92 +28,125 @@ export const FleetView: React.FC = () => {
         <div className="text-xs text-sky-900 leading-relaxed">
           <h4 className="font-bold text-sky-950 mb-0.5">Aluguel Inicial Gratuito</h4>
           <p className="text-sky-800/90">
-            Como você iniciou sua carreira com <strong>0 Créditos</strong>, o modelo <strong>Cessna 172 Skyhawk</strong> está disponível para aluguel sem taxas nos seus primeiros contratos. Conforme acumula créditos, você poderá alugar bimotores e turboélices pesados.
+            Como você iniciou sua carreira com <strong>0 Créditos</strong>, o modelo <strong>Cessna 172 Skyhawk</strong> está disponível para aluguel sem taxas nos seus primeiros contratos. Conforme acumula créditos, você poderá alugar bimotores, turboélices e jatos executivos.
           </p>
         </div>
       </div>
 
       {/* Aircraft Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {AIRCRAFT_CATALOG.map((aircraft) => (
+        {activeFleet.map((aircraft) => (
           <div
             key={aircraft.id}
-            className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-5 flex flex-col justify-between hover:border-sky-300 transition-all"
+            className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col justify-between hover:border-sky-300 hover:shadow-md transition-all group"
           >
             <div>
-              {/* Category Pill & Rental Tag */}
-              <div className="flex items-center justify-between mb-4">
-                <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border ${aircraft.imagePlaceholderColor}`}>
-                  {aircraft.category}
-                </span>
-
-                {aircraft.rentalFeePerFlight === 0 ? (
-                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Aluguel Grátis
-                  </span>
+              {/* Aircraft Photo / Header */}
+              <div className="relative h-44 bg-slate-900 overflow-hidden flex items-center justify-center">
+                {aircraft.imageUrl ? (
+                  <img
+                    src={aircraft.imageUrl}
+                    alt={aircraft.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
                 ) : (
-                  <span className="text-[10px] font-bold text-slate-500">
-                    {aircraft.rentalFeePerFlight} CR / voo
-                  </span>
+                  <div className="flex flex-col items-center justify-center text-slate-500 space-y-1">
+                    <Warehouse className="w-10 h-10 opacity-40 text-slate-300" />
+                    <span className="text-xs font-mono font-bold text-slate-400">{aircraft.icaoCode}</span>
+                  </div>
                 )}
+                
+                {/* Category Pill Over Image */}
+                <div className="absolute top-3 left-3">
+                  <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-md bg-slate-900/80 backdrop-blur-md text-white border border-white/20 shadow-xs">
+                    {aircraft.category}
+                  </span>
+                </div>
+
+                {/* ICAO Code Badge */}
+                <div className="absolute top-3 right-3">
+                  <span className="text-xs font-mono font-black px-2.5 py-1 rounded-md bg-sky-500 text-white shadow-xs">
+                    {aircraft.icaoCode}
+                  </span>
+                </div>
+
+                {/* Rental Tag */}
+                <div className="absolute bottom-3 right-3">
+                  {aircraft.rentalFeePerFlight === 0 ? (
+                    <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-md bg-emerald-500 text-white shadow-xs">
+                      Aluguel Grátis
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-slate-900/80 backdrop-blur-md text-slate-200 border border-white/10">
+                      {aircraft.rentalFeePerFlight?.toLocaleString('pt-BR') || 0} CR / voo
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Title & Manufacturer */}
-              <h3 className="text-lg font-black text-slate-800">{aircraft.name}</h3>
-              <p className="text-xs text-slate-400 font-medium mb-4">{aircraft.manufacturer}</p>
+              <div className="p-5">
+                {/* Title & Manufacturer */}
+                <h3 className="text-base font-black text-slate-800 leading-snug">{aircraft.name}</h3>
+                <p className="text-xs text-slate-400 font-bold mb-3">{aircraft.manufacturer}</p>
 
-              <p className="text-xs text-slate-600 leading-relaxed mb-6">
-                {aircraft.description}
-              </p>
-
-              {/* Specifications Grid */}
-              <div className="grid grid-cols-2 gap-2 text-[11px] mb-6">
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Cruzeiro</span>
-                  <p className="font-extrabold text-slate-800 flex items-center gap-1">
-                    <Gauge className="w-3.5 h-3.5 text-sky-500" />
-                    {aircraft.cruisingSpeedKts} kts
+                {aircraft.description && (
+                  <p className="text-xs text-slate-600 leading-relaxed mb-4 line-clamp-2 font-normal">
+                    {aircraft.description}
                   </p>
-                </div>
+                )}
 
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Alcance</span>
-                  <p className="font-extrabold text-slate-800 flex items-center gap-1">
-                    <Navigation className="w-3.5 h-3.5 text-indigo-500" />
-                    {aircraft.rangeNm} NM
-                  </p>
-                </div>
+                {/* Technical Specifications Grid */}
+                <div className="grid grid-cols-2 gap-2 text-[11px] mb-4">
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block mb-0.5">Combustível Máx</span>
+                    <p className="font-extrabold text-slate-800 flex items-center gap-1">
+                      <Fuel className="w-3.5 h-3.5 text-amber-500" />
+                      {aircraft.maxFuelGallons?.toLocaleString('pt-BR')} gal
+                    </p>
+                  </div>
 
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Passageiros</span>
-                  <p className="font-extrabold text-slate-800 flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-emerald-500" />
-                    Até {aircraft.passengerCapacity} pax
-                  </p>
-                </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block mb-0.5">Passageiros</span>
+                    <p className="font-extrabold text-slate-800 flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-emerald-500" />
+                      {aircraft.passengerCapacity} pax
+                    </p>
+                  </div>
 
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5">Carga Máxima</span>
-                  <p className="font-extrabold text-slate-800 flex items-center gap-1">
-                    <Package className="w-3.5 h-3.5 text-amber-500" />
-                    {aircraft.cargoCapacityKg} kg
-                  </p>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block mb-0.5">Peso Vazio (OEW)</span>
+                    <p className="font-extrabold text-slate-800 flex items-center gap-1">
+                      <Weight className="w-3.5 h-3.5 text-slate-400" />
+                      {aircraft.oewKg?.toLocaleString('pt-BR')} kg
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="text-[9px] text-slate-400 font-extrabold uppercase block mb-0.5">Carga Útil (Payload)</span>
+                    <p className="font-extrabold text-slate-800 flex items-center gap-1">
+                      <Package className="w-3.5 h-3.5 text-sky-500" />
+                      {aircraft.maxPayloadKg?.toLocaleString('pt-BR')} kg
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Price Footer */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+            <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Preço de Compra</span>
-                <p className="text-sm font-extrabold text-slate-800 flex items-center gap-1 mt-0.5">
+                <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Preço de Compra</span>
+                <p className="text-sm font-black text-slate-800 flex items-center gap-1 mt-0.5">
                   <Coins className="w-4 h-4 text-amber-500" />
-                  {aircraft.purchasePrice.toLocaleString('pt-BR')} CR
+                  {aircraft.purchasePrice ? `${aircraft.purchasePrice.toLocaleString('pt-BR')} CR` : 'Sob consulta'}
                 </p>
               </div>
 
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">
-                Disponível no MSFS
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600 shadow-2xs">
+                MTOW: {aircraft.mtowKg?.toLocaleString('pt-BR')} kg
               </span>
             </div>
           </div>
