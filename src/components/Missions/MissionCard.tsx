@@ -2,6 +2,7 @@ import React from 'react';
 import { Contract } from '../../types';
 import { MissionBadge } from '../UI/Badge';
 import { CompanyLogoBadge } from '../Common/CompanyLogoBadge';
+import { getCountryName } from '../../utils/countryUtils';
 import {
   Coins,
   Navigation,
@@ -17,6 +18,18 @@ interface MissionCardProps {
 }
 
 export const MissionCard: React.FC<MissionCardProps> = ({ contract, onSelect }) => {
+  const depCountry = getCountryName(
+    contract.route.departureIcao,
+    contract.route.departureCity,
+    contract.route.departureCountry
+  );
+
+  const arrCountry = getCountryName(
+    contract.route.arrivalIcao,
+    contract.route.arrivalCity,
+    contract.route.arrivalCountry
+  );
+
   return (
     <div
       onClick={() => onSelect(contract)}
@@ -35,15 +48,18 @@ export const MissionCard: React.FC<MissionCardProps> = ({ contract, onSelect }) 
           </div>
         </div>
 
-        {/* Hero Route Display - Clean, no background box */}
+        {/* Hero Route Display - Clean layout with Country above ICAO and City below */}
         <div className="pb-4 border-b border-slate-100">
           <div className="flex items-center justify-between gap-2">
             {/* Departure */}
-            <div className="w-24 text-center">
-              <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-tight block">
+            <div className="w-28 text-center flex flex-col items-center">
+              <span className="text-[11px] font-medium text-slate-500 block truncate w-full mb-0.5" title={depCountry}>
+                {depCountry}
+              </span>
+              <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-tight block leading-tight">
                 {contract.route.departureIcao}
               </span>
-              <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5" title={contract.route.departureCity}>
+              <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5 w-full" title={contract.route.departureCity}>
                 {contract.route.departureCity}
               </span>
             </div>
@@ -58,11 +74,14 @@ export const MissionCard: React.FC<MissionCardProps> = ({ contract, onSelect }) 
             </div>
 
             {/* Arrival */}
-            <div className="w-24 text-center">
-              <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-tight block">
+            <div className="w-28 text-center flex flex-col items-center">
+              <span className="text-[11px] font-medium text-slate-500 block truncate w-full mb-0.5" title={arrCountry}>
+                {arrCountry}
+              </span>
+              <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-tight block leading-tight">
                 {contract.route.arrivalIcao}
               </span>
-              <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5" title={contract.route.arrivalCity}>
+              <span className="text-[11px] font-medium text-slate-500 block truncate mt-0.5 w-full" title={contract.route.arrivalCity}>
                 {contract.route.arrivalCity}
               </span>
             </div>

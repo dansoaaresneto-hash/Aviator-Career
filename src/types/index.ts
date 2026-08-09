@@ -6,9 +6,11 @@ export interface RouteWaypoints {
   departureIcao: string;
   departureName: string;
   departureCity: string;
+  departureCountry?: string;
   arrivalIcao: string;
   arrivalName: string;
   arrivalCity: string;
+  arrivalCountry?: string;
   distanceNm: number;
   estimatedMinutes: number;
   recommendedAltitude: string;

@@ -1,5 +1,6 @@
 import { Contract, AdminCompany, CompanyMissionType, FerryDossier, AirportSample } from '../types';
 import { calculateDistanceNm } from './aviationNavMath';
+import { countryName } from './countryUtils';
 
 const AIRCRAFT_TEMPLATES = [
   { name: 'Cessna 172 Skyhawk', cat: 'Monomotor a Pistão', speed: 120 },
@@ -9,27 +10,6 @@ const AIRCRAFT_TEMPLATES = [
   { name: 'Beechcraft King Air 350i', cat: 'Bimotor Turboélice', speed: 300 },
   { name: 'Citation CJ4', cat: 'Jato Executivo', speed: 430 },
 ];
-
-// Nomes de países usados nos dossiês de translado internacional (a base do
-// OurAirports só nos dá o código ISO2 do país, então mapeamos os mais comuns
-// nas rotas do app; os demais caem no próprio código ISO2 como fallback).
-const COUNTRY_NAMES: Record<string, string> = {
-  BR: 'Brasil',
-  US: 'Estados Unidos',
-  PT: 'Portugal',
-  ES: 'Espanha',
-  FR: 'França',
-  AR: 'Argentina',
-  CL: 'Chile',
-  UY: 'Uruguai',
-  PY: 'Paraguai',
-  CO: 'Colômbia',
-  PE: 'Peru',
-};
-
-function countryName(iso: string): string {
-  return COUNTRY_NAMES[iso] || iso;
-}
 
 export function generateContractsFromCompanies(companies: AdminCompany[], airports: AirportSample[]): Contract[] {
   const activeCompanies = companies.filter((c) => c.isActive);
@@ -184,9 +164,11 @@ function createSingleContract(
         departureIcao: dep.icao,
         departureName: dep.name,
         departureCity: dep.city,
+        departureCountry: countryName(dep.country),
         arrivalIcao: arr.icao,
         arrivalName: arr.name,
         arrivalCity: arr.city,
+        arrivalCountry: countryName(arr.country),
         distanceNm: distance,
         estimatedMinutes: estTimeMins,
         recommendedAltitude: distance > 1500 ? 'FL280 / 28.000 ft' : 'FL180 / 18.000 ft',
@@ -216,9 +198,11 @@ function createSingleContract(
         departureIcao: dep.icao,
         departureName: dep.name,
         departureCity: dep.city,
+        departureCountry: countryName(dep.country),
         arrivalIcao: arr.icao,
         arrivalName: arr.name,
         arrivalCity: arr.city,
+        arrivalCountry: countryName(arr.country),
         distanceNm: distance,
         estimatedMinutes: estTimeMins,
         recommendedAltitude: distance > 200 ? 'FL100 / 10.000 ft' : '4.500 ft',
@@ -251,9 +235,11 @@ function createSingleContract(
         departureIcao: dep.icao,
         departureName: dep.name,
         departureCity: dep.city,
+        departureCountry: countryName(dep.country),
         arrivalIcao: arr.icao,
         arrivalName: arr.name,
         arrivalCity: arr.city,
+        arrivalCountry: countryName(arr.country),
         distanceNm: distance,
         estimatedMinutes: estTimeMins,
         recommendedAltitude: isInt ? 'FL250 / 25.000 ft' : 'FL120 / 12.000 ft',
@@ -283,9 +269,11 @@ function createSingleContract(
       departureIcao: dep.icao,
       departureName: dep.name,
       departureCity: dep.city,
+      departureCountry: countryName(dep.country),
       arrivalIcao: arr.icao,
       arrivalName: arr.name,
       arrivalCity: arr.city,
+      arrivalCountry: countryName(arr.country),
       distanceNm: distance,
       estimatedMinutes: estTimeMins,
       recommendedAltitude: distance > 200 ? 'FL100 / 10.000 ft' : '6.500 ft',
