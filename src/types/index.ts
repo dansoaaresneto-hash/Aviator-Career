@@ -127,6 +127,7 @@ export type ActiveTab = 'overview' | 'missions' | 'active-flight' | 'flight-plan
 
 export * from './companyAdmin';
 export * from './telemetry';
+export * from './regulatory';
 
 export interface FlightPlanWaypoint {
   id: string;
@@ -183,6 +184,9 @@ export interface AirportSample {
   lng: number;
   maxRunwayFt?: number;
   hasPavedRunway?: boolean;
+  isPortOfEntry?: boolean;
+  poeCustomsHours?: string;
+  poeNotes?: string;
 }
 
 export interface MetarData {

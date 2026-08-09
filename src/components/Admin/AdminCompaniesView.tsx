@@ -4,6 +4,11 @@ import { AdminCompany } from '../../types';
 import { CompanyCard } from './CompanyCard';
 import { CompanyModal } from './CompanyModal';
 import { AdminAircraftsView } from './AdminAircraftsView';
+import { AdminZonesTab } from './AdminZonesTab';
+import { AdminCountriesTab } from './AdminCountriesTab';
+import { AdminBodiesTab } from './AdminBodiesTab';
+import { AdminDocumentsTab } from './AdminDocumentsTab';
+import { AdminPortOfEntryTab } from './AdminPortOfEntryTab';
 import {
   Building2,
   Plus,
@@ -18,6 +23,8 @@ import {
   PlaneTakeoff,
   Layers,
   Plane,
+  Anchor,
+  FileText,
 } from 'lucide-react';
 
 export const AdminCompaniesView: React.FC = () => {
@@ -32,9 +39,15 @@ export const AdminCompaniesView: React.FC = () => {
     airportsLoading,
     airportsCount,
     refreshAirportsDatabase,
+    regulatoryZones,
+    countriesInfo,
+    regulatoryBodies,
+    requiredDocuments,
   } = usePilot();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'companies' | 'aircrafts'>('companies');
+  const [activeAdminTab, setActiveAdminTab] = useState<
+    'companies' | 'aircrafts' | 'zones' | 'countries' | 'bodies' | 'documents' | 'ports_of_entry'
+  >('companies');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
@@ -85,17 +98,17 @@ export const AdminCompaniesView: React.FC = () => {
     <div className="space-y-6">
       {/* Top Admin Sub-navigation Tabs */}
       <div className="bg-white rounded-2xl border border-slate-200/90 p-2 shadow-2xs flex items-center justify-between gap-2 overflow-x-auto">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
           <button
             onClick={() => setActiveAdminTab('companies')}
-            className={`px-5 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               activeAdminTab === 'companies'
                 ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Building2 className="w-4 h-4" />
-            <span>Empresas Fictícias</span>
+            <span>Empresas</span>
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                 activeAdminTab === 'companies'
@@ -109,14 +122,14 @@ export const AdminCompaniesView: React.FC = () => {
 
           <button
             onClick={() => setActiveAdminTab('aircrafts')}
-            className={`px-5 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
               activeAdminTab === 'aircrafts'
                 ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Plane className="w-4 h-4" />
-            <span>Gestão de Aeronaves</span>
+            <span>Frota</span>
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                 activeAdminTab === 'aircrafts'
@@ -127,16 +140,117 @@ export const AdminCompaniesView: React.FC = () => {
               {adminAircrafts.length}
             </span>
           </button>
-        </div>
 
-        <div className="hidden sm:flex items-center gap-2 pr-2 text-slate-400 text-xs font-semibold">
-          <ShieldCheck className="w-4 h-4 text-sky-500" />
-          <span>Painel de Controle Admin</span>
+          <button
+            onClick={() => setActiveAdminTab('zones')}
+            className={`px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeAdminTab === 'zones'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>Zonas Regulatórias</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                activeAdminTab === 'zones'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {regulatoryZones.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('countries')}
+            className={`px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeAdminTab === 'countries'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>Países & Regras</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                activeAdminTab === 'countries'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {countriesInfo.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('bodies')}
+            className={`px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeAdminTab === 'bodies'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Órgãos Reguladores</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                activeAdminTab === 'bodies'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {regulatoryBodies.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('documents')}
+            className={`px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeAdminTab === 'documents'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>Documentos</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                activeAdminTab === 'documents'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {requiredDocuments.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('ports_of_entry')}
+            className={`px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeAdminTab === 'ports_of_entry'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Anchor className="w-4 h-4" />
+            <span>Port of Entry (POE)</span>
+          </button>
         </div>
       </div>
 
       {activeAdminTab === 'aircrafts' ? (
         <AdminAircraftsView />
+      ) : activeAdminTab === 'zones' ? (
+        <AdminZonesTab />
+      ) : activeAdminTab === 'countries' ? (
+        <AdminCountriesTab />
+      ) : activeAdminTab === 'bodies' ? (
+        <AdminBodiesTab />
+      ) : activeAdminTab === 'documents' ? (
+        <AdminDocumentsTab />
+      ) : activeAdminTab === 'ports_of_entry' ? (
+        <AdminPortOfEntryTab />
       ) : (
         <>
           {/* Top Header Banner */}

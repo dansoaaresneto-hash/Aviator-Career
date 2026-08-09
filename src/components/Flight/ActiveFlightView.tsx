@@ -5,6 +5,7 @@ import { MissionBadge } from '../UI/Badge';
 import { FlightDebriefModal } from './FlightDebriefModal';
 import { MissionValidationBanner } from './MissionValidationBanner';
 import { ConnectorDownloadModal } from './ConnectorDownloadModal';
+import { PilotKneeboard } from '../Missions/PilotKneeboard';
 import {
   Plane,
   Navigation,
@@ -179,6 +180,9 @@ export const ActiveFlightView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Electronic Flight Bag (EFB) Kneeboard for Missions */}
+      <PilotKneeboard contract={activeContract} />
 
       {/* Top Banner: Flight Telemetry & Route */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl p-6 sm:p-8 text-white border border-slate-700 shadow-md">

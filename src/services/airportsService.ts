@@ -43,7 +43,7 @@ async function fetchAllMissionAirports() {
   while (true) {
     const { data, error } = await supabase
       .from('mission_airports')
-      .select('icao, name, city, country, lat, lng, max_runway_ft, has_paved_runway')
+      .select('icao, name, city, country, lat, lng, max_runway_ft, has_paved_runway, is_port_of_entry, poe_customs_hours, poe_notes')
       .order('icao', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
 
@@ -88,6 +88,9 @@ export async function fetchMissionAirportPool(options?: { forceRefresh?: boolean
       lng: row.lng,
       maxRunwayFt: row.max_runway_ft ?? undefined,
       hasPavedRunway: row.has_paved_runway ?? undefined,
+      isPortOfEntry: Boolean(row.is_port_of_entry),
+      poeCustomsHours: row.poe_customs_hours || undefined,
+      poeNotes: row.poe_notes || undefined,
     }));
 
     writeCache(airports);
