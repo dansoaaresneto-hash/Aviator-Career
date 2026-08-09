@@ -169,6 +169,20 @@ export interface AiracCycleInfo {
   isCurrent: boolean;
 }
 
+// Aeroporto real vindo da view `mission_airports` (Supabase), alimentada pelo
+// dataset público do OurAirports. Usado pelo gerador de missões e, no futuro,
+// pelo cálculo de paradas de reabastecimento em translados longos.
+export interface AirportSample {
+  icao: string;
+  name: string;
+  city: string;
+  country: string; // ISO 3166-1 alpha-2, ex: BR, US, PT
+  lat: number;
+  lng: number;
+  maxRunwayFt?: number;
+  hasPavedRunway?: boolean;
+}
+
 export interface MetarData {
   icao: string;
   rawMetar: string;

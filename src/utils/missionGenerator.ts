@@ -1,68 +1,5 @@
-import { Contract, AdminCompany, CompanyMissionType, FerryDossier } from '../types';
-
-interface AirportSample {
-  icao: string;
-  name: string;
-  city: string;
-  country: string; // ISO code: BR, US, PT, ES, AR, CL, etc.
-}
-
-const AIRPORTS_DATABASE: AirportSample[] = [
-  // Brasil (BR)
-  { icao: 'SBSP', name: 'Aeroporto de Congonhas', city: 'São Paulo - SP', country: 'BR' },
-  { icao: 'SBGR', name: 'Aeroporto Internacional de Guarulhos', city: 'Guarulhos - SP', country: 'BR' },
-  { icao: 'SBRJ', name: 'Aeroporto Santos Dumont', city: 'Rio de Janeiro - RJ', country: 'BR' },
-  { icao: 'SBGL', name: 'Aeroporto Internacional Galeão', city: 'Rio de Janeiro - RJ', country: 'BR' },
-  { icao: 'SBKP', name: 'Aeroporto Internacional de Viracopos', city: 'Campinas - SP', country: 'BR' },
-  { icao: 'SBCF', name: 'Aeroporto Internacional de Confins', city: 'Belo Horizonte - MG', country: 'BR' },
-  { icao: 'SBBH', name: 'Aeroporto da Pampulha', city: 'Belo Horizonte - MG', country: 'BR' },
-  { icao: 'SBBR', name: 'Aeroporto Internacional de Brasília', city: 'Brasília - DF', country: 'BR' },
-  { icao: 'SBSG', name: 'Aeroporto Internacional de Natal', city: 'Natal - RN', country: 'BR' },
-  { icao: 'SBEG', name: 'Aeroporto Internacional de Manaus', city: 'Manaus - AM', country: 'BR' },
-  { icao: 'SBGO', name: 'Aeroporto de Goiânia Santa Genoveva', city: 'Goiânia - GO', country: 'BR' },
-  { icao: 'SBMT', name: 'Aeroporto Campo de Marte', city: 'São Paulo - SP', country: 'BR' },
-  { icao: 'SBJD', name: 'Aeroporto Estadual de Jundiaí', city: 'Jundiaí - SP', country: 'BR' },
-  { icao: 'SBJR', name: 'Aeroporto de Jacarepaguá', city: 'Rio de Janeiro - RJ', country: 'BR' },
-  { icao: 'SDAG', name: 'Aeroporto de Angra dos Reis', city: 'Angra dos Reis - RJ', country: 'BR' },
-  { icao: 'SBDN', name: 'Aeroporto de Presidente Prudente', city: 'Presidente Prudente - SP', country: 'BR' },
-  { icao: 'SBPF', name: 'Aeroporto de Passo Fundo', city: 'Passo Fundo - RS', country: 'BR' },
-  { icao: 'SBCX', name: 'Aeroporto de Caxias do Sul', city: 'Caxias do Sul - RS', country: 'BR' },
-
-  // Estados Unidos (US)
-  { icao: 'KMIA', name: 'Miami International Airport', city: 'Miami - FL', country: 'US' },
-  { icao: 'KJFK', name: 'John F. Kennedy International', city: 'New York - NY', country: 'US' },
-  { icao: 'KLAX', name: 'Los Angeles International', city: 'Los Angeles - CA', country: 'US' },
-  { icao: 'KTEB', name: 'Teterboro Executive Airport', city: 'Teterboro - NJ', country: 'US' },
-
-  // Portugal & Europa (PT, ES, FR)
-  { icao: 'LPPT', name: 'Aeroporto Humberto Delgado', city: 'Lisboa - Portugal', country: 'PT' },
-  { icao: 'LEMD', name: 'Adolfo Suárez Madrid-Barajas', city: 'Madri - Espanha', country: 'ES' },
-  { icao: 'LFPG', name: 'Charles de Gaulle Airport', city: 'Paris - França', country: 'FR' },
-
-  // América do Sul (AR, CL, UY)
-  { icao: 'SAEZ', name: 'Aeropuerto Internacional Ezeiza', city: 'Buenos Aires - Argentina', country: 'AR' },
-  { icao: 'SCEL', name: 'Aeropuerto Arturo Merino Benítez', city: 'Santiago - Chile', country: 'CL' },
-  { icao: 'SUMU', name: 'Aeropuerto Internacional Carrasco', city: 'Montevidéu - Uruguai', country: 'UY' },
-];
-
-// Helper to calculate approximate distance in NM between ICAOs
-function getDistanceNm(dep: AirportSample, arr: AirportSample): number {
-  if (dep.country === arr.country) {
-    if (dep.city.includes('São Paulo') && arr.city.includes('Rio de Janeiro')) return 198;
-    if (dep.city.includes('Campinas') && arr.city.includes('Belo Horizonte')) return 220;
-    if (dep.city.includes('São Paulo') && arr.city.includes('Jundiaí')) return 32;
-    if (dep.city.includes('Rio de Janeiro') && arr.city.includes('Angra')) return 62;
-    if (dep.city.includes('Belo Horizonte') && arr.city.includes('Goiânia')) return 290;
-    if (dep.city.includes('Caxias') && arr.city.includes('Passo Fundo')) return 95;
-    return Math.floor(100 + Math.random() * 350);
-  }
-  // International
-  if ((dep.country === 'PT' || dep.country === 'ES') && arr.country === 'BR') return 3850;
-  if (dep.country === 'US' && arr.country === 'BR') return 2890;
-  if (dep.country === 'AR' && arr.country === 'BR') return 1200;
-  if (dep.country === 'CL' && arr.country === 'BR') return 1650;
-  return Math.floor(1200 + Math.random() * 2500);
-}
+import { Contract, AdminCompany, CompanyMissionType, FerryDossier, AirportSample } from '../types';
+import { calculateDistanceNm } from './aviationNavMath';
 
 const AIRCRAFT_TEMPLATES = [
   { name: 'Cessna 172 Skyhawk', cat: 'Monomotor a Pistão', speed: 120 },
@@ -73,9 +10,30 @@ const AIRCRAFT_TEMPLATES = [
   { name: 'Citation CJ4', cat: 'Jato Executivo', speed: 430 },
 ];
 
-export function generateContractsFromCompanies(companies: AdminCompany[]): Contract[] {
+// Nomes de países usados nos dossiês de translado internacional (a base do
+// OurAirports só nos dá o código ISO2 do país, então mapeamos os mais comuns
+// nas rotas do app; os demais caem no próprio código ISO2 como fallback).
+const COUNTRY_NAMES: Record<string, string> = {
+  BR: 'Brasil',
+  US: 'Estados Unidos',
+  PT: 'Portugal',
+  ES: 'Espanha',
+  FR: 'França',
+  AR: 'Argentina',
+  CL: 'Chile',
+  UY: 'Uruguai',
+  PY: 'Paraguai',
+  CO: 'Colômbia',
+  PE: 'Peru',
+};
+
+function countryName(iso: string): string {
+  return COUNTRY_NAMES[iso] || iso;
+}
+
+export function generateContractsFromCompanies(companies: AdminCompany[], airports: AirportSample[]): Contract[] {
   const activeCompanies = companies.filter((c) => c.isActive);
-  if (activeCompanies.length === 0) return [];
+  if (activeCompanies.length === 0 || airports.length === 0) return [];
 
   const generated: Contract[] = [];
 
@@ -85,7 +43,7 @@ export function generateContractsFromCompanies(companies: AdminCompany[]): Contr
     if (types.length === 0) return;
 
     types.forEach((missionTypeKey, idx) => {
-      const contract = createSingleContract(comp, missionTypeKey, idx + 1);
+      const contract = createSingleContract(comp, missionTypeKey, idx + 1, airports);
       if (contract) {
         generated.push(contract);
       }
@@ -95,25 +53,45 @@ export function generateContractsFromCompanies(companies: AdminCompany[]): Contr
   return generated;
 }
 
-function createSingleContract(comp: AdminCompany, missionTypeKey: CompanyMissionType, subIndex: number): Contract | null {
+function createSingleContract(
+  comp: AdminCompany,
+  missionTypeKey: CompanyMissionType,
+  subIndex: number,
+  airports: AirportSample[]
+): Contract | null {
   const rules = comp.routeRules;
   const allowedOrigins = rules.originCountries.length > 0 ? rules.originCountries : ['BR'];
   const allowedDests = rules.destinationCountries.length > 0 ? rules.destinationCountries : ['BR'];
 
   // Filter airports matching allowed origin / dest countries
-  const depAirports = AIRPORTS_DATABASE.filter((a) => allowedOrigins.includes(a.country));
-  let arrAirports = AIRPORTS_DATABASE.filter((a) => allowedDests.includes(a.country));
+  const depAirports = airports.filter((a) => allowedOrigins.includes(a.country));
+  let arrAirports = airports.filter((a) => allowedDests.includes(a.country));
 
   if (depAirports.length === 0) return null;
 
   const dep = depAirports[Math.floor(Math.random() * depAirports.length)];
-  
+
   // Filter out same airport
   arrAirports = arrAirports.filter((a) => a.icao !== dep.icao);
-  if (arrAirports.length === 0) arrAirports = AIRPORTS_DATABASE.filter((a) => a.icao !== dep.icao);
-  
-  const arr = arrAirports[Math.floor(Math.random() * arrAirports.length)];
-  const distance = getDistanceNm(dep, arr);
+  if (arrAirports.length === 0) arrAirports = airports.filter((a) => a.icao !== dep.icao);
+
+  // Respeita minDistanceNm / maxDistanceNm da empresa quando definidos,
+  // tentando algumas vezes antes de desistir da restrição (a base real tem
+  // aeroportos suficientes pra isso quase sempre dar certo de primeira).
+  let arr = arrAirports[Math.floor(Math.random() * arrAirports.length)];
+  let distance = calculateDistanceNm(dep.lat, dep.lng, arr.lat, arr.lng);
+
+  if (rules.minDistanceNm || rules.maxDistanceNm) {
+    const min = rules.minDistanceNm ?? 0;
+    const max = rules.maxDistanceNm ?? Infinity;
+    let attempts = 0;
+    while ((distance < min || distance > max) && attempts < 15) {
+      arr = arrAirports[Math.floor(Math.random() * arrAirports.length)];
+      distance = calculateDistanceNm(dep.lat, dep.lng, arr.lat, arr.lng);
+      attempts++;
+    }
+  }
+
   const estTimeMins = Math.round((distance / 220) * 60) + 15;
 
   const contractCompanyObj = {
@@ -132,7 +110,14 @@ function createSingleContract(comp: AdminCompany, missionTypeKey: CompanyMission
     const isUS = dep.country === 'US';
     const originalReg = isUS ? `N${Math.floor(100 + Math.random() * 800)}TX` : `CS-${comp.icaoCode.substring(0, 2)}X`;
     const newReg = `PR-${comp.icaoCode.substring(0, 2)}${subIndex}`;
-    const portIcao = dep.country === 'US' ? 'SBEG' : 'SBSG';
+    // Port of entry no Brasil: usa um aeroporto internacional brasileiro real
+    // da própria base (prioriza os que têm atendimento de linha / scheduled_service).
+    const brPorts = airports.filter((a) => a.country === 'BR' && a.icao !== dep.icao && a.icao !== arr.icao);
+    const portCandidates = brPorts.filter((a) => a.hasPavedRunway !== false);
+    const portAirport = (portCandidates.length > 0 ? portCandidates : brPorts)[
+      Math.floor(Math.random() * Math.max(1, (portCandidates.length > 0 ? portCandidates : brPorts).length))
+    ] || arr;
+    const portIcao = portAirport.icao;
 
     const ferryDossier: FerryDossier = {
       aircraftModel: 'King Air 350i / TBM 930',
@@ -144,12 +129,12 @@ function createSingleContract(comp: AdminCompany, missionTypeKey: CompanyMission
       currentOwner: `${comp.name} Global Leasing`,
       ownerTaxId: `REG-${dep.country}-${Math.floor(100000 + Math.random() * 800000)}`,
       originCountryCode: dep.country,
-      originCountryName: dep.country === 'US' ? 'Estados Unidos' : dep.country === 'PT' ? 'Portugal' : dep.country,
+      originCountryName: countryName(dep.country),
       destinationCountryCode: arr.country,
-      destinationCountryName: arr.country === 'BR' ? 'Brasil' : arr.country,
+      destinationCountryName: countryName(arr.country),
       portOfEntryIcao: portIcao,
-      portOfEntryName: portIcao === 'SBEG' ? 'Aeroporto Internacional de Manaus' : 'Aeroporto Internacional de Natal',
-      portOfEntryCity: portIcao === 'SBEG' ? 'Manaus - AM (Brasil)' : 'Natal - RN (Brasil)',
+      portOfEntryName: portAirport.name,
+      portOfEntryCity: `${portAirport.city} (${countryName('BR')})`,
       exportFeeCr: 1800,
       nationalizationFeeCr: 3800,
     };

@@ -1,0 +1,29 @@
+name: Sync Airports Database (OurAirports)
+
+on:
+  schedule:
+    # Todo dia 1 de cada mês, às 06:00 UTC. Os dados do OurAirports mudam
+    # pouco de um mês pro outro, então essa frequência é mais que suficiente.
+    - cron: '0 6 1 * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install @supabase/supabase-js
+
+      - name: Run import script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/import-ourairports.mjs

@@ -5,7 +5,7 @@ import { MissionCard } from './MissionCard';
 import { MissionDetailModal } from './MissionDetailModal';
 import { FerryMissionModal } from './FerryMissionModal';
 import { Contract } from '../../types';
-import { PlaneTakeoff, SearchX, Building2 } from 'lucide-react';
+import { PlaneTakeoff, SearchX, Building2, Loader2 } from 'lucide-react';
 
 export const MissionsView: React.FC = () => {
   const {
@@ -15,6 +15,7 @@ export const MissionsView: React.FC = () => {
     selectedContractForPreview,
     setSelectedContractForPreview,
     setActiveTab,
+    airportsLoading,
   } = usePilot();
 
   // Filter contracts based on tab and search term
@@ -70,7 +71,17 @@ export const MissionsView: React.FC = () => {
       <MissionFilters />
 
       {/* Contracts Grid */}
-      {filteredContracts.length === 0 ? (
+      {filteredContracts.length === 0 && airportsLoading ? (
+        <div className="bg-white rounded-xl p-12 text-center border border-slate-200/90 shadow-sm max-w-lg mx-auto">
+          <div className="w-16 h-16 rounded-full bg-sky-50 text-sky-500 flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+          <h3 className="text-base font-bold text-slate-800">Carregando base de aeroportos...</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Buscando aeroportos reais para gerar os contratos disponíveis.
+          </p>
+        </div>
+      ) : filteredContracts.length === 0 ? (
         <div className="bg-white rounded-xl p-12 text-center border border-slate-200/90 shadow-sm max-w-lg mx-auto">
           <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
             <SearchX className="w-8 h-8" />

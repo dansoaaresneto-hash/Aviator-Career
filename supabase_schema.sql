@@ -180,3 +180,98 @@ DROP POLICY IF EXISTS "Backend pode atualizar telemetria" ON public.sim_telemetr
 CREATE POLICY "Backend pode atualizar telemetria"
   ON public.sim_telemetry FOR UPDATE
   USING (true);
+
+-- 6. BASE DE AEROPORTOS REAIS (OurAirports) — airports / runways
+-- Substitui a lista fixa de ~30 aeroportos que existia hardcoded no
+-- missionGenerator.ts. É alimentada pelo script scripts/import-ourairports.mjs
+-- (rodado localmente ou pela GitHub Action .github/workflows/sync-airports.yml),
+-- usando os dados públicos (domínio público / CC0) de https://ourairports.com/data/.
+-- O app (frontend, com a chave anônima) só tem permissão de LEITURA aqui —
+-- a escrita/sincronização é feita sempre com a Service Role Key, que nunca
+-- fica no frontend.
+CREATE TABLE IF NOT EXISTS public.airports (
+  icao TEXT PRIMARY KEY,                 -- Código ICAO (4 letras), ex: SBGR
+  iata TEXT,                             -- Código IATA (3 letras), quando existir
+  name TEXT NOT NULL,
+  municipality TEXT,                     -- Cidade atendida pelo aeroporto
+  country TEXT NOT NULL,                 -- ISO 3166-1 alpha-2, ex: BR, US, PT
+  continent TEXT,
+  type TEXT NOT NULL,                    -- small_airport | medium_airport | large_airport
+  lat DOUBLE PRECISION,
+  lng DOUBLE PRECISION,
+  elevation_ft INTEGER,
+  scheduled_service BOOLEAN DEFAULT FALSE,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_airports_country ON public.airports (country);
+CREATE INDEX IF NOT EXISTS idx_airports_type ON public.airports (type);
+
+ALTER TABLE public.airports ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Qualquer um pode ler aeroportos" ON public.airports;
+CREATE POLICY "Qualquer um pode ler aeroportos"
+  ON public.airports FOR SELECT
+  USING (true);
+-- Sem política de INSERT/UPDATE/DELETE para anon/authenticated de propósito:
+-- só a Service Role Key (usada pelo script de importação) pode escrever aqui,
+-- pois ela ignora RLS.
+
+CREATE TABLE IF NOT EXISTS public.runways (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  airport_icao TEXT NOT NULL REFERENCES public.airports(icao) ON DELETE CASCADE,
+  length_ft INTEGER,
+  width_ft INTEGER,
+  surface TEXT,
+  lighted BOOLEAN DEFAULT FALSE,
+  closed BOOLEAN DEFAULT FALSE,
+  le_ident TEXT,
+  he_ident TEXT
+);
+
+-- Chave de conflito usada pelo upsert do script de importação (uma pista é
+-- identificada pelo aeroporto + as duas cabeceiras).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_runways_unique
+  ON public.runways (airport_icao, COALESCE(le_ident, ''), COALESCE(he_ident, ''));
+CREATE INDEX IF NOT EXISTS idx_runways_airport ON public.runways (airport_icao);
+
+ALTER TABLE public.runways ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Qualquer um pode ler pistas" ON public.runways;
+CREATE POLICY "Qualquer um pode ler pistas"
+  ON public.runways FOR SELECT
+  USING (true);
+
+-- View pronta para o gerador de missões e (no futuro) para o cálculo de
+-- paradas de reabastecimento: já traz o comprimento da maior pista e se ela
+-- é pavimentada, e filtra fora heliportos/balloonports/aeroportos fechados.
+CREATE OR REPLACE VIEW public.mission_airports AS
+SELECT
+  a.icao,
+  a.iata,
+  a.name,
+  a.municipality AS city,
+  a.country,
+  a.continent,
+  a.type,
+  a.lat,
+  a.lng,
+  a.elevation_ft,
+  a.scheduled_service,
+  COALESCE(r.max_runway_ft, 0) AS max_runway_ft,
+  COALESCE(r.has_paved_runway, FALSE) AS has_paved_runway
+FROM public.airports a
+LEFT JOIN (
+  SELECT
+    airport_icao,
+    MAX(length_ft) AS max_runway_ft,
+    BOOL_OR(surface ILIKE ANY (ARRAY['ASP%', 'CON%', 'BIT%', 'PEM%'])) AS has_paved_runway
+  FROM public.runways
+  WHERE COALESCE(closed, FALSE) = FALSE
+  GROUP BY airport_icao
+) r ON r.airport_icao = a.icao
+WHERE a.type IN ('small_airport', 'medium_airport', 'large_airport')
+  AND a.lat IS NOT NULL
+  AND a.lng IS NOT NULL;
+
+GRANT SELECT ON public.mission_airports TO anon, authenticated;

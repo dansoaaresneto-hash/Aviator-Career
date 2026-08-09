@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Contract, FlightLog, PilotProfile, ActiveTab, AdminCompany, AircraftModel } from '../types';
+import { Contract, FlightLog, PilotProfile, ActiveTab, AdminCompany, AircraftModel, AirportSample } from '../types';
 import { INITIAL_ADMIN_COMPANIES } from '../data/initialCompanies';
 import { AIRCRAFT_CATALOG } from '../data/initialFleet';
 import { generateContractsFromCompanies } from '../utils/missionGenerator';
+import { fetchMissionAirportPool } from '../services/airportsService';
 import { useTelemetry } from './TelemetryContext';
 
 interface PilotContextType {
@@ -38,6 +39,8 @@ interface PilotContextType {
   deleteCompany: (companyId: string) => void;
   toggleCompanyActive: (companyId: string) => void;
   regenerateMissions: () => void;
+  airportsLoading: boolean;
+  refreshAirportsDatabase: () => Promise<void>;
   // Admin Aircraft Management
   adminAircrafts: AircraftModel[];
   saveAircraft: (aircraft: AircraftModel) => void;
@@ -86,15 +89,42 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return INITIAL_ADMIN_COMPANIES;
   });
 
-  const [contracts, setContracts] = useState<Contract[]>(() => {
-    return generateContractsFromCompanies(adminCompanies);
-  });
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [airportPool, setAirportPool] = useState<AirportSample[]>([]);
+  const [airportsLoading, setAirportsLoading] = useState<boolean>(true);
 
-  // Automatically update contracts whenever adminCompanies change
+  // Busca a base real de aeroportos (Supabase, alimentada pelo OurAirports)
+  // uma vez ao carregar o app. As missões só são geradas depois que essa
+  // base chega — antes disso, "contracts" fica vazio.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setAirportsLoading(true);
+      const pool = await fetchMissionAirportPool();
+      if (cancelled) return;
+      setAirportPool(pool);
+      setAirportsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Regenera as missões sempre que a lista de empresas OU a base de
+  // aeroportos mudar (a base só muda uma vez, quando termina de carregar).
   useEffect(() => {
     localStorage.setItem('aviator_admin_companies', JSON.stringify(adminCompanies));
-    setContracts(generateContractsFromCompanies(adminCompanies));
-  }, [adminCompanies]);
+    if (airportPool.length > 0) {
+      setContracts(generateContractsFromCompanies(adminCompanies, airportPool));
+    }
+  }, [adminCompanies, airportPool]);
+
+  const refreshAirportsDatabase = async () => {
+    setAirportsLoading(true);
+    const pool = await fetchMissionAirportPool({ forceRefresh: true });
+    setAirportPool(pool);
+    setAirportsLoading(false);
+  };
 
   const saveCompany = (company: AdminCompany) => {
     setAdminCompanies((prev) => {
@@ -119,7 +149,8 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const regenerateMissions = () => {
-    setContracts(generateContractsFromCompanies(adminCompanies));
+    if (airportPool.length === 0) return; // base ainda carregando — o efeito acima cuida disso assim que chegar
+    setContracts(generateContractsFromCompanies(adminCompanies, airportPool));
   };
 
   const [adminAircrafts, setAdminAircrafts] = useState<AircraftModel[]>(() => {
@@ -490,7 +521,7 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const resetCareerData = () => {
     setProfile(INITIAL_PROFILE);
     setAdminCompanies(INITIAL_ADMIN_COMPANIES);
-    setContracts(generateContractsFromCompanies(INITIAL_ADMIN_COMPANIES));
+    setContracts(airportPool.length > 0 ? generateContractsFromCompanies(INITIAL_ADMIN_COMPANIES, airportPool) : []);
     setActiveContract(null);
     setFlightPhase(null);
     setFlightProgress(0);
@@ -542,6 +573,8 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deleteCompany,
         toggleCompanyActive,
         regenerateMissions,
+        airportsLoading,
+        refreshAirportsDatabase,
         adminAircrafts,
         saveAircraft,
         deleteAircraft,

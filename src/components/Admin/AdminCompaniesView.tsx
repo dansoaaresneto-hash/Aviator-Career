@@ -29,6 +29,8 @@ export const AdminCompaniesView: React.FC = () => {
     regenerateMissions,
     contracts,
     adminAircrafts,
+    airportsLoading,
+    refreshAirportsDatabase,
   } = usePilot();
 
   const [activeAdminTab, setActiveAdminTab] = useState<'companies' | 'aircrafts'>('companies');
@@ -38,6 +40,7 @@ export const AdminCompaniesView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<AdminCompany | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isSyncingAirports, setIsSyncingAirports] = useState(false);
 
   const handleCreateNew = () => {
     setEditingCompany(null);
@@ -55,6 +58,12 @@ export const AdminCompaniesView: React.FC = () => {
     setTimeout(() => {
       setIsRegenerating(false);
     }, 600);
+  };
+
+  const handleSyncAirports = async () => {
+    setIsSyncingAirports(true);
+    await refreshAirportsDatabase();
+    setIsSyncingAirports(false);
   };
 
   // Filter companies
@@ -147,6 +156,16 @@ export const AdminCompaniesView: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <button
+                  onClick={handleSyncAirports}
+                  disabled={isSyncingAirports || airportsLoading}
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                  title="Rebusca a base de aeroportos no Supabase, ignorando o cache local de 24h"
+                >
+                  <Globe className={`w-4 h-4 text-emerald-400 ${isSyncingAirports || airportsLoading ? 'animate-spin' : ''}`} />
+                  <span>Sincronizar Base de Aeroportos</span>
+                </button>
+
                 <button
                   onClick={handleRegenerate}
                   disabled={isRegenerating}
