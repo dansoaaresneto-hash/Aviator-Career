@@ -24,7 +24,7 @@ import {
   INITIAL_POE_AIRPORT_ICAOS,
 } from '../data/initialRegulatoryData';
 import { generateContractsFromCompanies } from '../utils/missionGenerator';
-import { fetchMissionAirportPool } from '../services/airportsService';
+import { fetchMissionAirportPool, updateAirportInCache } from '../services/airportsService';
 import { useTelemetry } from './TelemetryContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -919,11 +919,12 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return ap;
       })
     );
+
     try {
-      await supabase
-        .from('airports')
-        .update({ is_port_of_entry: updatedIsPoe })
-        .eq('icao', icao);
+      await Promise.allSettled([
+        supabase.from('mission_airports').update({ is_port_of_entry: updatedIsPoe }).eq('icao', icao),
+        supabase.from('airports').update({ is_port_of_entry: updatedIsPoe }).eq('icao', icao),
+      ]);
     } catch (err) {
       console.error('Erro no Supabase toggleAirportPortOfEntry:', err);
     }
@@ -943,19 +944,25 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return ap;
       })
     );
+
     try {
-      await supabase
-        .from('airports')
-        .update({
+      await Promise.allSettled([
+        supabase.from('mission_airports').update({
           is_port_of_entry: true,
           poe_customs_hours: poeCustomsHours,
           poe_notes: poeNotes,
-        })
-        .eq('icao', icao);
+        }).eq('icao', icao),
+        supabase.from('airports').update({
+          is_port_of_entry: true,
+          poe_customs_hours: poeCustomsHours,
+          poe_notes: poeNotes,
+        }).eq('icao', icao),
+      ]);
     } catch (err) {
       console.error('Erro no Supabase updateAirportPoeInfo:', err);
     }
   };
+
 
   // Submissão de documentos do voo
   const submitMissionDocument = async (contractId: string, documentId: string, formData: Record<string, any>) => {

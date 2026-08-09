@@ -1,39 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { AirportSample } from '../types';
 
-// Cache local do pool de aeroportos, pra não bater no Supabase a cada
-// carregamento de tela. A base do OurAirports muda pouco de um dia pro
-// outro, então 24h de validade é bastante seguro.
-const CACHE_KEY = 'aviator_airports_pool_v1';
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
-
-interface CachedPool {
-  fetchedAt: number;
-  airports: AirportSample[];
-}
-
-function readCache(): AirportSample[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const parsed: CachedPool = JSON.parse(raw);
-    if (!parsed.airports?.length) return null;
-    if (Date.now() - parsed.fetchedAt > CACHE_TTL_MS) return null;
-    return parsed.airports;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(airports: AirportSample[]) {
-  try {
-    const payload: CachedPool = { fetchedAt: Date.now(), airports };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  } catch {
-    // localStorage cheio ou indisponível — não é crítico, seguimos sem cache
-  }
-}
-
 const PAGE_SIZE = 1000;
 
 async function fetchAllMissionAirports() {
@@ -60,17 +27,10 @@ async function fetchAllMissionAirports() {
 }
 
 /**
- * Busca o pool de aeroportos reais (view `mission_airports`, alimentada pelo
- * OurAirports) para uso no gerador de missões. Usa cache local de 24h;
- * passe `forceRefresh: true` para ignorar o cache (ex: botão "Atualizar" no
- * admin).
+ * Busca o pool de aeroportos reais diretamente do Supabase (tabela/view `mission_airports`).
+ * Sem cache em localStorage para garantir sincronização global entre todos os usuários.
  */
-export async function fetchMissionAirportPool(options?: { forceRefresh?: boolean }): Promise<AirportSample[]> {
-  if (!options?.forceRefresh) {
-    const cached = readCache();
-    if (cached) return cached;
-  }
-
+export async function fetchMissionAirportPool(_options?: { forceRefresh?: boolean }): Promise<AirportSample[]> {
   if (!isSupabaseConfigured) {
     console.warn('Supabase não configurado — não é possível buscar a base de aeroportos.');
     return [];
@@ -93,10 +53,17 @@ export async function fetchMissionAirportPool(options?: { forceRefresh?: boolean
       poeNotes: row.poe_notes || undefined,
     }));
 
-    writeCache(airports);
     return airports;
   } catch (error: any) {
     console.error('Falha ao buscar aeroportos do Supabase:', error?.message || error);
-    return readCache() || [];
+    return [];
   }
+}
+
+export function updateAirportInCache(_icao: string, _updates: Partial<AirportSample>) {
+  // Mantido para compatibilidade, sem op
+}
+
+export function clearAirportCache() {
+  // Mantido para compatibilidade, sem op
 }
