@@ -19,7 +19,8 @@ import {
   MapPin,
   Clock,
   Volume2,
-  Radio
+  Radio,
+  FastForward
 } from 'lucide-react';
 
 export const ActiveFlightView: React.FC = () => {
@@ -28,6 +29,7 @@ export const ActiveFlightView: React.FC = () => {
     flightPhase,
     flightProgress,
     advanceFlightPhase,
+    adminAdvanceFlightLeg,
     abandonContract,
     currentLocationIcao,
     intermediateStops,
@@ -66,6 +68,39 @@ export const ActiveFlightView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Admin Quick Test Controls Banner */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-500/10 border-2 border-dashed border-amber-500/40 rounded-xl p-4 text-amber-950 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 font-black shadow-sm">
+            <FastForward className="w-5 h-5 fill-current" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                Painel de Teste Admin
+              </span>
+              <span className="text-xs font-black text-amber-900">
+                Avançar Etapa / Perna do Voo
+              </span>
+            </div>
+            <p className="text-xs text-amber-900/90 font-medium mt-0.5">
+              Simule as etapas e pernas do voo (Briefing ➔ Táxi ➔ Voo ➔ Escala Port of Entry ➔ Pouso) sem precisar do MSFS.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={adminAdvanceFlightLeg}
+            className="w-full sm:w-auto px-5 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border border-amber-400"
+            title="Avança instantaneamente para a próxima etapa/perna da missão"
+          >
+            <FastForward className="w-4 h-4 fill-current" />
+            <span>Avançar Próxima Etapa / Perna</span>
+          </button>
+        </div>
+      </div>
+
       {/* Real-Time Pre-Flight Mission Validation Banner */}
       <MissionValidationBanner />
 
@@ -275,13 +310,22 @@ export const ActiveFlightView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-5 mt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between pt-5 mt-4 border-t border-slate-100 flex-wrap gap-2">
             <button
               onClick={abandonContract}
               className="text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2.5 rounded-lg border border-red-200 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <AlertTriangle className="w-4 h-4" />
               <span>Cancelar / Abandonar Voo</span>
+            </button>
+
+            <button
+              onClick={adminAdvanceFlightLeg}
+              className="text-xs font-black text-amber-900 bg-amber-500 hover:bg-amber-400 px-4 py-2.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm border border-amber-600/80"
+              title="Avançar etapa/perna da missão [Admin]"
+            >
+              <FastForward className="w-4 h-4 fill-current" />
+              <span>Avançar Perna / Etapa [Admin]</span>
             </button>
 
             {flightPhase === 'landed' && (

@@ -13,11 +13,12 @@ import {
   ArrowRight,
   TrendingUp,
   Compass,
-  Sparkles
+  Sparkles,
+  FastForward
 } from 'lucide-react';
 
 export const Overview: React.FC = () => {
-  const { profile, contracts, setActiveTab, setFilterType, activeContract, logbook } = usePilot();
+  const { profile, contracts, setActiveTab, setFilterType, activeContract, logbook, adminAdvanceFlightLeg } = usePilot();
 
   const cargoCount = contracts.filter((c) => c.type === 'cargo').length;
   const paxCount = contracts.filter((c) => c.type === 'passenger').length;
@@ -60,13 +61,24 @@ export const Overview: React.FC = () => {
                 <ArrowRight className="w-4 h-4 ml-1" />
               </button>
             ) : (
-              <button
-                onClick={() => setActiveTab('active-flight')}
-                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-lg shadow-sm transition-all text-xs animate-pulse cursor-pointer"
-              >
-                <Plane className="w-4 h-4" />
-                <span>Continuar Voo Ativo ({activeContract.route.departureIcao} ➔ {activeContract.route.arrivalIcao})</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setActiveTab('active-flight')}
+                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-2.5 rounded-lg shadow-sm transition-all text-xs animate-pulse cursor-pointer"
+                >
+                  <Plane className="w-4 h-4" />
+                  <span>Continuar Voo Ativo ({activeContract.route.departureIcao} ➔ {activeContract.route.arrivalIcao})</span>
+                </button>
+
+                <button
+                  onClick={adminAdvanceFlightLeg}
+                  className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-black px-3.5 py-2.5 rounded-lg shadow-sm transition-all text-xs cursor-pointer border border-amber-400"
+                  title="Avançar para a próxima etapa/perna do voo sem precisar voar no MSFS"
+                >
+                  <FastForward className="w-4 h-4 fill-current" />
+                  <span>Avançar Perna [Admin]</span>
+                </button>
+              </div>
             )}
 
             <button

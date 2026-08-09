@@ -22,6 +22,7 @@ interface PilotContextType {
   acceptContract: (contract: Contract) => void;
   abandonContract: () => void;
   advanceFlightPhase: () => void;
+  adminAdvanceFlightLeg: () => void;
   completeFlight: (landingScore?: number) => void;
   updateProfileName: (name: string, callsign: string) => void;
   resetCareerData: () => void;
@@ -443,6 +444,59 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const adminAdvanceFlightLeg = () => {
+    if (!activeContract) return;
+
+    if (!flightPhase || flightPhase === 'briefing') {
+      setFlightPhase('taxi');
+      setFlightProgress((prev) => Math.max(prev, 25));
+      return;
+    }
+
+    if (flightPhase === 'taxi') {
+      setFlightPhase('cruise');
+      setFlightProgress((prev) => Math.max(prev, 60));
+      return;
+    }
+
+    if (flightPhase === 'cruise') {
+      const portOfEntryIcao = activeContract.ferryDossier?.portOfEntryIcao;
+      const targetArrivalIcao = activeContract.route.arrivalIcao;
+
+      // If ferry flight with a Port of Entry stop that hasn't been visited yet
+      if (
+        portOfEntryIcao &&
+        currentLocationIcao !== portOfEntryIcao &&
+        portOfEntryIcao !== targetArrivalIcao
+      ) {
+        setFlightPhase('intermediate_landing');
+        setCurrentLocationIcao(portOfEntryIcao);
+        setIntermediateStops((prev) => {
+          if (prev.some((s) => s.icao === portOfEntryIcao)) return prev;
+          return [...prev, { icao: portOfEntryIcao, timestamp: new Date().toISOString() }];
+        });
+        setFlightProgress(75);
+      } else {
+        // Direct flight or second leg -> landed at final destination
+        setFlightPhase('landed');
+        setCurrentLocationIcao(targetArrivalIcao);
+        setFlightProgress(100);
+      }
+      return;
+    }
+
+    if (flightPhase === 'intermediate_landing') {
+      // From Port of Entry/scale -> advance to taxi for leg 2
+      setFlightPhase('taxi');
+      setFlightProgress((prev) => Math.max(prev, 80));
+      return;
+    }
+
+    if (flightPhase === 'landed') {
+      setFlightProgress(100);
+    }
+  };
+
   const completeFlight = (landingScore: number = 95) => {
     if (!activeContract) return;
 
@@ -558,6 +612,7 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         acceptContract,
         abandonContract,
         advanceFlightPhase,
+        adminAdvanceFlightLeg,
         completeFlight,
         updateProfileName,
         resetCareerData,
