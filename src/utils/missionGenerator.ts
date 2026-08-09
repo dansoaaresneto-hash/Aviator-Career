@@ -60,32 +60,68 @@ function createSingleContract(
   airports: AirportSample[]
 ): Contract | null {
   const rules = comp.routeRules;
-  const allowedOrigins = rules.originCountries.length > 0 ? rules.originCountries : ['BR'];
-  const allowedDests = rules.destinationCountries.length > 0 ? rules.destinationCountries : ['BR'];
+  const scope = rules?.scope || 'national';
+  const allowedOrigins = rules?.originCountries && rules.originCountries.length > 0 ? rules.originCountries : ['BR'];
+  const allowedDests = rules?.destinationCountries && rules.destinationCountries.length > 0 ? rules.destinationCountries : ['BR'];
 
-  // Filter airports matching allowed origin / dest countries
-  const depAirports = airports.filter((a) => allowedOrigins.includes(a.country));
-  let arrAirports = airports.filter((a) => allowedDests.includes(a.country));
+  // Determine scope restrictions
+  let forceNational = scope === 'national' || missionTypeKey === 'ferry_national' || missionTypeKey === 'pax_regional';
+  let forceInternational = scope === 'international';
 
+  if (scope === 'national') {
+    forceNational = true;
+    forceInternational = false;
+  } else if (scope === 'international') {
+    forceInternational = true;
+    forceNational = false;
+  }
+
+  // Filter possible departure airports
+  let depAirports = airports.filter((a) => allowedOrigins.includes(a.country));
+  if (depAirports.length === 0) {
+    depAirports = airports.filter((a) => a.country === 'BR');
+  }
   if (depAirports.length === 0) return null;
 
-  const dep = depAirports[Math.floor(Math.random() * depAirports.length)];
+  // Shuffle candidate departure airports to pick one that has matching arrival options
+  const shuffledDeps = [...depAirports].sort(() => 0.5 - Math.random());
+  let dep: AirportSample | null = null;
+  let arrAirports: AirportSample[] = [];
 
-  // Filter out same airport
-  arrAirports = arrAirports.filter((a) => a.icao !== dep.icao);
-  if (arrAirports.length === 0) arrAirports = airports.filter((a) => a.icao !== dep.icao);
+  for (const candidateDep of shuffledDeps) {
+    let candidates = airports.filter((a) => allowedDests.includes(a.country) && a.icao !== candidateDep.icao);
 
-  // Respeita minDistanceNm / maxDistanceNm da empresa quando definidos,
-  // tentando algumas vezes antes de desistir da restrição (a base real tem
-  // aeroportos suficientes pra isso quase sempre dar certo de primeira).
+    if (forceNational) {
+      candidates = candidates.filter((a) => a.country === candidateDep.country);
+      // Fallback: if user selected origin countries but destination countries didn't include it, look in same country
+      if (candidates.length === 0) {
+        candidates = airports.filter((a) => a.country === candidateDep.country && a.icao !== candidateDep.icao);
+      }
+    } else if (forceInternational) {
+      candidates = candidates.filter((a) => a.country !== candidateDep.country);
+      if (candidates.length === 0) {
+        candidates = airports.filter((a) => a.country !== candidateDep.country && a.icao !== candidateDep.icao);
+      }
+    }
+
+    if (candidates.length > 0) {
+      dep = candidateDep;
+      arrAirports = candidates;
+      break;
+    }
+  }
+
+  if (!dep || arrAirports.length === 0) return null;
+
+  // Filter candidates by minDistanceNm / maxDistanceNm if specified
   let arr = arrAirports[Math.floor(Math.random() * arrAirports.length)];
   let distance = calculateDistanceNm(dep.lat, dep.lng, arr.lat, arr.lng);
 
-  if (rules.minDistanceNm || rules.maxDistanceNm) {
-    const min = rules.minDistanceNm ?? 0;
-    const max = rules.maxDistanceNm ?? Infinity;
+  if (rules?.minDistanceNm || rules?.maxDistanceNm) {
+    const min = rules?.minDistanceNm ?? 0;
+    const max = rules?.maxDistanceNm ?? Infinity;
     let attempts = 0;
-    while ((distance < min || distance > max) && attempts < 15) {
+    while ((distance < min || distance > max) && attempts < 20) {
       arr = arrAirports[Math.floor(Math.random() * arrAirports.length)];
       distance = calculateDistanceNm(dep.lat, dep.lng, arr.lat, arr.lng);
       attempts++;
@@ -106,7 +142,7 @@ function createSingleContract(
   const contractId = `contract-${comp.icaoCode.toLowerCase()}-${missionTypeKey}-${subIndex}-${Math.floor(Math.random() * 1000)}`;
 
   // Determine Mission Category
-  if (missionTypeKey === 'ferry_international') {
+  if (missionTypeKey === 'ferry_international' && dep.country !== arr.country) {
     const isUS = dep.country === 'US';
     const originalReg = isUS ? `N${Math.floor(100 + Math.random() * 800)}TX` : `CS-${comp.icaoCode.substring(0, 2)}X`;
     const newReg = `PR-${comp.icaoCode.substring(0, 2)}${subIndex}`;

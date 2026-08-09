@@ -34,6 +34,31 @@ function writeCache(airports: AirportSample[]) {
   }
 }
 
+const PAGE_SIZE = 1000;
+
+async function fetchAllMissionAirports() {
+  let allRows: any[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('mission_airports')
+      .select('icao, name, city, country, lat, lng, max_runway_ft, has_paved_runway')
+      .order('icao', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    allRows = allRows.concat(data);
+    if (data.length < PAGE_SIZE) break; // última página
+
+    from += PAGE_SIZE;
+  }
+
+  return allRows;
+}
+
 /**
  * Busca o pool de aeroportos reais (view `mission_airports`, alimentada pelo
  * OurAirports) para uso no gerador de missões. Usa cache local de 24h;
@@ -51,29 +76,24 @@ export async function fetchMissionAirportPool(options?: { forceRefresh?: boolean
     return [];
   }
 
-  const { data, error } = await supabase
-    .from('mission_airports')
-    .select('icao, name, city, country, lat, lng, max_runway_ft, has_paved_runway')
-    .order('icao', { ascending: true });
+  try {
+    const data = await fetchAllMissionAirports();
 
-  if (error) {
-    console.error('Falha ao buscar aeroportos do Supabase:', error.message);
-    // Se falhar mas tivermos um cache expirado, é melhor usar dado velho do
-    // que nenhum dado — o app não pode ficar sem aeroportos pra gerar missões.
+    const airports: AirportSample[] = (data || []).map((row) => ({
+      icao: row.icao,
+      name: row.name,
+      city: row.city || row.icao,
+      country: row.country,
+      lat: row.lat,
+      lng: row.lng,
+      maxRunwayFt: row.max_runway_ft ?? undefined,
+      hasPavedRunway: row.has_paved_runway ?? undefined,
+    }));
+
+    writeCache(airports);
+    return airports;
+  } catch (error: any) {
+    console.error('Falha ao buscar aeroportos do Supabase:', error?.message || error);
     return readCache() || [];
   }
-
-  const airports: AirportSample[] = (data || []).map((row) => ({
-    icao: row.icao,
-    name: row.name,
-    city: row.city || row.icao,
-    country: row.country,
-    lat: row.lat,
-    lng: row.lng,
-    maxRunwayFt: row.max_runway_ft ?? undefined,
-    hasPavedRunway: row.has_paved_runway ?? undefined,
-  }));
-
-  writeCache(airports);
-  return airports;
 }

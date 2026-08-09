@@ -40,6 +40,7 @@ interface PilotContextType {
   toggleCompanyActive: (companyId: string) => void;
   regenerateMissions: () => void;
   airportsLoading: boolean;
+  airportsCount: number;
   refreshAirportsDatabase: () => Promise<void>;
   // Admin Aircraft Management
   adminAircrafts: AircraftModel[];
@@ -574,6 +575,7 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleCompanyActive,
         regenerateMissions,
         airportsLoading,
+        airportsCount: airportPool.length,
         refreshAirportsDatabase,
         adminAircrafts,
         saveAircraft,

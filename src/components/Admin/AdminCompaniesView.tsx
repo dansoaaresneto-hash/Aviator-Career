@@ -30,6 +30,7 @@ export const AdminCompaniesView: React.FC = () => {
     contracts,
     adminAircrafts,
     airportsLoading,
+    airportsCount,
     refreshAirportsDatabase,
   } = usePilot();
 
@@ -160,10 +161,13 @@ export const AdminCompaniesView: React.FC = () => {
                   onClick={handleSyncAirports}
                   disabled={isSyncingAirports || airportsLoading}
                   className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
-                  title="Rebusca a base de aeroportos no Supabase, ignorando o cache local de 24h"
+                  title="Rebusca a base de aeroportos no Supabase em lotes de 1000, ignorando o cache local de 24h"
                 >
                   <Globe className={`w-4 h-4 text-emerald-400 ${isSyncingAirports || airportsLoading ? 'animate-spin' : ''}`} />
                   <span>Sincronizar Base de Aeroportos</span>
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-black">
+                    {airportsLoading ? '...' : `${airportsCount} ICAOs`}
+                  </span>
                 </button>
 
                 <button
