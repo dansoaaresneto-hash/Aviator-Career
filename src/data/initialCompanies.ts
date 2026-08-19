@@ -34,8 +34,8 @@ export const INITIAL_ADMIN_COMPANIES: AdminCompany[] = [
     routeRules: {
       scope: 'international',
       selectedRegions: ['south_america', 'north_america'],
-      originCountries: ['BR', 'US', 'AR', 'CL'],
-      destinationCountries: ['BR', 'US', 'AR', 'CL', 'UY'],
+      originCountries: ['BR', 'US'],
+      destinationCountries: ['BR', 'US'],
       minDistanceNm: 80,
       maxDistanceNm: 3500,
     },
@@ -54,8 +54,8 @@ export const INITIAL_ADMIN_COMPANIES: AdminCompany[] = [
     routeRules: {
       scope: 'global',
       selectedRegions: ['south_america', 'north_america', 'europe'],
-      originCountries: ['BR', 'US', 'PT', 'ES', 'FR'],
-      destinationCountries: ['BR', 'US', 'PT', 'ES'],
+      originCountries: ['BR', 'US', 'PT'],
+      destinationCountries: ['BR', 'US', 'PT'],
       minDistanceNm: 30,
       maxDistanceNm: 5000,
     },

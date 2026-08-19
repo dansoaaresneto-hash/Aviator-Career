@@ -15,11 +15,13 @@ import { SettingsView } from './components/Settings/SettingsView';
 import { ConnectorView } from './components/Connector/ConnectorView';
 import { LiveRadarView } from './components/LiveRadar/LiveRadarView';
 import { AdminCompaniesView } from './components/Admin/AdminCompaniesView';
+import { CareerLicensesView } from './components/Career/CareerLicensesView';
+import { CareerModeSelectModal } from './components/Career/CareerModeSelectModal';
 import { AuthScreen } from './components/Auth/AuthScreen';
 import { Plane } from 'lucide-react';
 
 const MainContent: React.FC = () => {
-  const { activeTab } = usePilot();
+  const { activeTab, isCareerModeModalOpen, setIsCareerModeModalOpen } = usePilot();
 
   return (
     <main className="flex-1 min-w-0">
@@ -28,6 +30,7 @@ const MainContent: React.FC = () => {
       <div className="min-h-[600px]">
         {activeTab === 'overview' && <Overview />}
         {activeTab === 'missions' && <MissionsView />}
+        {activeTab === 'career' && <CareerLicensesView />}
         {activeTab === 'admin-companies' && <AdminCompaniesView />}
         {activeTab === 'flight-planner' && <FlightPlannerView />}
         {activeTab === 'live-map' && <LiveRadarView />}
@@ -38,6 +41,13 @@ const MainContent: React.FC = () => {
         {activeTab === 'profile' && <ProfileView />}
         {activeTab === 'settings' && <SettingsView />}
       </div>
+
+      {/* First-access Career Mode Selection Modal */}
+      <CareerModeSelectModal
+        isOpen={isCareerModeModalOpen}
+        onClose={() => setIsCareerModeModalOpen(false)}
+        isInitialSetup={true}
+      />
     </main>
   );
 };

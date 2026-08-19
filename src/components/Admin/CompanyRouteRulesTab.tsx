@@ -1,6 +1,8 @@
 import React from 'react';
 import { AdminCompany, WORLD_REGIONS, CompanyRouteRule } from '../../types';
-import { Globe, MapPin, Check, Compass, Sliders, RotateCcw } from 'lucide-react';
+import { usePilot } from '../../context/PilotContext';
+import { checkCountryRegulatoryStatus } from '../../utils/regulatoryEngine';
+import { Globe, MapPin, Check, Compass, Sliders, AlertCircle } from 'lucide-react';
 
 interface Props {
   formData: Partial<AdminCompany>;
@@ -8,6 +10,8 @@ interface Props {
 }
 
 export const CompanyRouteRulesTab: React.FC<Props> = ({ formData, setFormData }) => {
+  const { countriesInfo, regulatoryBodies, regulatoryZones, airportPool } = usePilot();
+
   const routeRules: CompanyRouteRule = formData.routeRules || {
     scope: 'national',
     selectedRegions: ['south_america'],
@@ -89,14 +93,20 @@ export const CompanyRouteRulesTab: React.FC<Props> = ({ formData, setFormData })
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-xs text-slate-600">
-        <h4 className="font-bold text-slate-800 text-sm mb-1 flex items-center gap-1.5">
+      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-xs text-slate-600 space-y-2">
+        <h4 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
           <Globe className="w-4 h-4 text-sky-600" />
           Regras de Atuação de Rotas & Cobertura Geográfica
         </h4>
         <p>
-          Defina o escopo operacional e a cobertura de países de origem e destino. Clique nos botões de <strong>Região</strong> para selecionar automaticamente todos os países daquela região e desmarque manualmente os países desejados.
+          Defina o escopo operacional e a cobertura de países de origem e destino da empresa.
         </p>
+        <div className="flex items-center gap-2 pt-1 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200/60 p-2.5 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            <strong>Diretriz Regulatória:</strong> Para que uma rota de translado internacional seja gerada entre dois países, ambos devem possuir <strong>Zona Regulatória</strong>, <strong>Órgão Regulador</strong> e ao menos um <strong>Port of Entry (POE)</strong> cadastrados no Admin. Países não configurados serão ignorados pelo despachador automático.
+          </span>
+        </div>
       </div>
 
       {/* Scope Selector */}
@@ -194,27 +204,56 @@ export const CompanyRouteRulesTab: React.FC<Props> = ({ formData, setFormData })
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {region.countries.map((country) => {
                   const isChecked = (routeRules.originCountries || []).includes(country.code);
+                  const regStatus = checkCountryRegulatoryStatus(
+                    country.code,
+                    { countriesInfo, regulatoryBodies, regulatoryZones, airportPool }
+                  );
+
                   return (
                     <div
                       key={country.code}
                       onClick={() => toggleCountry(country.code)}
-                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                      title={
+                        regStatus.isEligibleForInternationalFerry
+                          ? `✓ Homologado para Translados: ${regStatus.poeCount} Port(s) of Entry ativos`
+                          : `Configuração regulatória pendente: ${regStatus.missingRequirements.join(', ')}`
+                      }
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-1.5 cursor-pointer transition-all ${
                         isChecked
                           ? 'bg-white border-sky-500 text-sky-950 font-bold shadow-2xs'
                           : 'bg-white/60 border-slate-200 text-slate-400 opacity-70 hover:opacity-100'
                       }`}
                     >
-                      <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 text-[10px] ${
-                          isChecked ? 'bg-sky-600 border-sky-600 text-white font-extrabold' : 'border-slate-300 bg-white'
-                        }`}
-                      >
-                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                      <div className="flex items-center gap-2 min-w-0 truncate">
+                        <div
+                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 text-[10px] ${
+                            isChecked ? 'bg-sky-600 border-sky-600 text-white font-extrabold' : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <span className="font-mono text-[10px] bg-slate-100 px-1 rounded text-slate-600 shrink-0">
+                          {country.code}
+                        </span>
+                        <span className="truncate">{country.name}</span>
                       </div>
-                      <span className="font-mono text-[10px] bg-slate-100 px-1 rounded text-slate-600">
-                        {country.code}
-                      </span>
-                      <span className="truncate">{country.name}</span>
+
+                      {/* Regulatory Readiness Badge */}
+                      {regStatus.isEligibleForInternationalFerry ? (
+                        <span
+                          className="text-[9px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold shrink-0"
+                          title={`${regStatus.poeCount} Port of Entry disponível(is)`}
+                        >
+                          POE ({regStatus.poeCount})
+                        </span>
+                      ) : isChecked ? (
+                        <span
+                          className="text-[9px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 font-medium shrink-0"
+                          title="Sem POE/Órgão cadastrado - não gerará translados internacionais até ser configurado"
+                        >
+                          Pendente
+                        </span>
+                      ) : null}
                     </div>
                   );
                 })}

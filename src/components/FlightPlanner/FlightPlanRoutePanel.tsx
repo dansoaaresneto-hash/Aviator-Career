@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FlightPlanWaypoint, AeronauticalFix, ProcedureOption } from '../../types';
+import { FlightPlanWaypoint, AeronauticalFix, ProcedureOption, AirportSample } from '../../types';
 import { searchAeronauticalFixes, fetchProceduresForAirport } from '../../utils/airacService';
 import { calculateDistanceNm, calculateBearingDeg } from '../../utils/aviationNavMath';
+import { AirportSearchSelect } from '../Common/AirportSearchSelect';
 import {
   Search,
   PlaneTakeoff,
@@ -15,7 +16,11 @@ import {
   Route,
   ChevronDown,
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  MapPin,
+  Globe,
+  Fuel,
+  Clock
 } from 'lucide-react';
 
 interface FlightPlanRoutePanelProps {
@@ -42,6 +47,9 @@ export const FlightPlanRoutePanel: React.FC<FlightPlanRoutePanelProps> = ({
   const [searchResults, setSearchResults] = useState<AeronauticalFix[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [showSearchModal, setShowSearchModal] = useState<boolean>(false);
+  const [showStopModal, setShowStopModal] = useState<boolean>(false);
+  const [stopSelectedIcao, setStopSelectedIcao] = useState<string>('');
+  const [stopAirportData, setStopAirportData] = useState<AirportSample | null>(null);
 
   // Procedure Selection states
   const [sidOptions, setSidOptions] = useState<ProcedureOption[]>([]);
@@ -363,16 +371,137 @@ export const FlightPlanRoutePanel: React.FC<FlightPlanRoutePanelProps> = ({
         </div>
       </div>
 
-      {/* Search & Add Custom Waypoint Button */}
-      <div className="flex items-center justify-between">
+      {/* Search & Add Custom Waypoint and Technical Stop Buttons */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <button
           onClick={() => setShowSearchModal(true)}
-          className="w-full py-2 px-3 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+          className="w-full py-2 px-3 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
         >
           <Search className="w-4 h-4 text-sky-600" />
-          <span>Buscar e Adicionar Fixos / VOR / Aeroportos à Rota</span>
+          <span>Buscar Fixos / VOR</span>
+        </button>
+
+        <button
+          onClick={() => setShowStopModal(true)}
+          className="w-full py-2 px-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+        >
+          <MapPin className="w-4 h-4 text-amber-600" />
+          <span>Declarar Escala Técnica</span>
         </button>
       </div>
+
+      {/* Technical Stop Modal (Connected to Supabase Airports DB) */}
+      {showStopModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm">Declarar Escala Técnica</h4>
+                  <p className="text-[11px] text-slate-500">Busca em tempo real na base de aeroportos (Supabase)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowStopModal(false);
+                  setStopSelectedIcao('');
+                  setStopAirportData(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 text-lg font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Digite o Nome, ICAO ou Cidade do Aeroporto
+                </label>
+                <AirportSearchSelect
+                  value={stopSelectedIcao}
+                  onChange={(icao, airport) => {
+                    setStopSelectedIcao(icao);
+                    setStopAirportData(airport || null);
+                  }}
+                  placeholder="Digite o nome ou ICAO do aeroporto..."
+                />
+              </div>
+
+              {stopAirportData && (
+                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-black text-slate-900 text-xs bg-white px-2 py-0.5 rounded border border-amber-200">
+                      {stopAirportData.icao}
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-900 bg-amber-200/60 px-2 py-0.5 rounded">
+                      {stopAirportData.country || 'Aeroporto'}
+                    </span>
+                  </div>
+                  <p className="font-bold text-slate-800 text-xs">{stopAirportData.name}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    {stopAirportData.city ? `${stopAirportData.city} • ` : ''}
+                    LAT: {stopAirportData.lat?.toFixed(4)} LON: {stopAirportData.lng?.toFixed(4)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStopModal(false);
+                  setStopSelectedIcao('');
+                  setStopAirportData(null);
+                }}
+                className="px-3 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!stopSelectedIcao}
+                onClick={() => {
+                  if (stopAirportData) {
+                    const newWp: FlightPlanWaypoint = {
+                      id: `wp-stop-${stopAirportData.icao}-${Date.now()}`,
+                      identifier: stopAirportData.icao,
+                      name: `${stopAirportData.name} (Escala)`,
+                      type: 'airport',
+                      lat: stopAirportData.lat,
+                      lng: stopAirportData.lng,
+                      elevationFt: 0,
+                      viaAirway: 'DCT',
+                    };
+                    setWaypoints((prev) => {
+                      if (prev.length <= 1) return [...prev, newWp];
+                      const copy = [...prev];
+                      copy.splice(copy.length - 1, 0, newWp);
+                      return recalculateWaypoints(copy);
+                    });
+                  } else {
+                    // Fallback to async search if only icao
+                    handleSearch(stopSelectedIcao).then(() => {
+                      // Handled by user
+                    });
+                  }
+                  setShowStopModal(false);
+                  setStopSelectedIcao('');
+                  setStopAirportData(null);
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Inserir Escala na Rota</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search Modal Backdrop */}
       {showSearchModal && (

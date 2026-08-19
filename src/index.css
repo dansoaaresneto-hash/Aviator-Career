@@ -13,6 +13,10 @@ body, button, input, select, textarea, * {
 }
 
 @layer utilities {
+  .font-handwriting {
+    font-family: 'Patrick Hand', cursive, sans-serif !important;
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;

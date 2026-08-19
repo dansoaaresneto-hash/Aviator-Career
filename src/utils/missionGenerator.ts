@@ -1,6 +1,13 @@
 import { Contract, AdminCompany, CompanyMissionType, FerryDossier, AirportSample } from '../types';
 import { calculateDistanceNm } from './aviationNavMath';
 import { countryName } from './countryUtils';
+import {
+  findOptimalStagingAirport,
+  findOptimalPortOfEntry,
+  buildFerryDossier,
+  getEligibleInternationalCountries,
+  RegulatoryContext,
+} from './regulatoryEngine';
 
 const AIRCRAFT_TEMPLATES = [
   { name: 'Cessna 172 Skyhawk', cat: 'Monomotor a Pistão', speed: 120 },
@@ -11,19 +18,23 @@ const AIRCRAFT_TEMPLATES = [
   { name: 'Citation CJ4', cat: 'Jato Executivo', speed: 430 },
 ];
 
-export function generateContractsFromCompanies(companies: AdminCompany[], airports: AirportSample[]): Contract[] {
+export function generateContractsFromCompanies(
+  companies: AdminCompany[],
+  airports: AirportSample[],
+  regulatoryConfig?: RegulatoryContext
+): Contract[] {
   const activeCompanies = companies.filter((c) => c.isActive);
   if (activeCompanies.length === 0 || airports.length === 0) return [];
 
   const generated: Contract[] = [];
 
   activeCompanies.forEach((comp) => {
-    // Generate 2-3 contracts per active company based on allowed mission types
+    // Generate contracts per active company based on allowed mission types
     const types = comp.allowedMissionTypes;
     if (types.length === 0) return;
 
     types.forEach((missionTypeKey, idx) => {
-      const contract = createSingleContract(comp, missionTypeKey, idx + 1, airports);
+      const contract = createSingleContract(comp, missionTypeKey, idx + 1, airports, regulatoryConfig);
       if (contract) {
         generated.push(contract);
       }
@@ -37,23 +48,56 @@ function createSingleContract(
   comp: AdminCompany,
   missionTypeKey: CompanyMissionType,
   subIndex: number,
-  airports: AirportSample[]
+  airports: AirportSample[],
+  regulatoryConfig?: RegulatoryContext
 ): Contract | null {
   const rules = comp.routeRules;
   const scope = rules?.scope || 'national';
-  const allowedOrigins = rules?.originCountries && rules.originCountries.length > 0 ? rules.originCountries : ['BR'];
-  const allowedDests = rules?.destinationCountries && rules.destinationCountries.length > 0 ? rules.destinationCountries : ['BR'];
+
+  // Determine eligible international countries if regulatory context is provided
+  const eligibleIntCountries = regulatoryConfig
+    ? getEligibleInternationalCountries(regulatoryConfig, airports)
+    : ['BR', 'US', 'PT'];
+
+  let allowedOrigins = rules?.originCountries && rules.originCountries.length > 0 ? rules.originCountries : ['BR'];
+  let allowedDests = rules?.destinationCountries && rules.destinationCountries.length > 0 ? rules.destinationCountries : ['BR'];
 
   // Determine scope restrictions
-  let forceNational = scope === 'national' || missionTypeKey === 'ferry_national' || missionTypeKey === 'pax_regional';
+  let forceNational = scope === 'national';
   let forceInternational = scope === 'international';
 
-  if (scope === 'national') {
+  if (missionTypeKey === 'ferry_international' || missionTypeKey === 'pax_international') {
+    forceInternational = true;
+    forceNational = false;
+  } else if (missionTypeKey === 'ferry_national' || missionTypeKey === 'pax_regional') {
+    forceNational = true;
+    forceInternational = false;
+  } else if (scope === 'national') {
     forceNational = true;
     forceInternational = false;
   } else if (scope === 'international') {
     forceInternational = true;
     forceNational = false;
+  }
+
+  // If international, strictly enforce that origin and destination countries have complete regulatory infrastructure:
+  // (Country info, Regulatory Zone, Regulatory Body, AND at least one Port of Entry)
+  if (forceInternational) {
+    allowedOrigins = allowedOrigins.filter((c) => eligibleIntCountries.includes(c.toUpperCase()));
+    allowedDests = allowedDests.filter((c) => eligibleIntCountries.includes(c.toUpperCase()));
+
+    // Fallback if the company had only unconfigured countries selected
+    if (allowedOrigins.length === 0) {
+      allowedOrigins = eligibleIntCountries.filter((c) => c !== 'BR');
+      if (allowedOrigins.length === 0) allowedOrigins = eligibleIntCountries;
+    }
+    if (allowedDests.length === 0) {
+      allowedDests = eligibleIntCountries.includes('BR') ? ['BR'] : eligibleIntCountries;
+    }
+
+    if (allowedOrigins.length === 0 || allowedDests.length === 0) {
+      return null;
+    }
   }
 
   // Filter possible departure airports
@@ -73,15 +117,13 @@ function createSingleContract(
 
     if (forceNational) {
       candidates = candidates.filter((a) => a.country === candidateDep.country);
-      // Fallback: if user selected origin countries but destination countries didn't include it, look in same country
       if (candidates.length === 0) {
         candidates = airports.filter((a) => a.country === candidateDep.country && a.icao !== candidateDep.icao);
       }
     } else if (forceInternational) {
-      candidates = candidates.filter((a) => a.country !== candidateDep.country);
-      if (candidates.length === 0) {
-        candidates = airports.filter((a) => a.country !== candidateDep.country && a.icao !== candidateDep.icao);
-      }
+      candidates = candidates.filter(
+        (a) => a.country !== candidateDep.country && eligibleIntCountries.includes(a.country.toUpperCase())
+      );
     }
 
     if (candidates.length > 0) {
@@ -123,41 +165,20 @@ function createSingleContract(
 
   // Determine Mission Category
   if (missionTypeKey === 'ferry_international' && dep.country !== arr.country) {
-    const isUS = dep.country === 'US';
-    const originalReg = isUS ? `N${Math.floor(100 + Math.random() * 800)}TX` : `CS-${comp.icaoCode.substring(0, 2)}X`;
-    const newReg = `PR-${comp.icaoCode.substring(0, 2)}${subIndex}`;
-    // Port of entry no Brasil: usa um aeroporto internacional brasileiro real
-    // da própria base (prioriza os que têm atendimento de linha / scheduled_service).
-    const brPorts = airports.filter((a) => a.country === 'BR' && a.icao !== dep.icao && a.icao !== arr.icao);
-    const portCandidates = brPorts.filter((a) => a.hasPavedRunway !== false);
-    const portAirport = (portCandidates.length > 0 ? portCandidates : brPorts)[
-      Math.floor(Math.random() * Math.max(1, (portCandidates.length > 0 ? portCandidates : brPorts).length))
-    ] || arr;
-    const portIcao = portAirport.icao;
+    const stagingAirport = findOptimalStagingAirport(dep, arr, airports);
+    const poeAirport = findOptimalPortOfEntry(stagingAirport, arr, airports);
+    const ferryDossier = buildFerryDossier(dep, arr, airports, comp.name, comp.icaoCode, subIndex);
 
-    const ferryDossier: FerryDossier = {
-      aircraftModel: 'King Air 350i / TBM 930',
-      manufacturer: isUS ? 'Textron Aviation' : 'Daher Aerospace',
-      msn: `MSN ${1000 + Math.floor(Math.random() * 500)}`,
-      originalRegistration: originalReg,
-      newRegistration: newReg,
-      mtowKg: isUS ? 6804 : 3354,
-      currentOwner: `${comp.name} Global Leasing`,
-      ownerTaxId: `REG-${dep.country}-${Math.floor(100000 + Math.random() * 800000)}`,
-      originCountryCode: dep.country,
-      originCountryName: countryName(dep.country),
-      destinationCountryCode: arr.country,
-      destinationCountryName: countryName(arr.country),
-      portOfEntryIcao: portIcao,
-      portOfEntryName: portAirport.name,
-      portOfEntryCity: `${portAirport.city} (${countryName('BR')})`,
-      exportFeeCr: 1800,
-      nationalizationFeeCr: 3800,
-    };
+    const stagingIcao = stagingAirport.icao;
+    const portIcao = poeAirport.icao;
+
+    const routeTitle = `Translado Internacional (${comp.icaoCode}): ${dep.icao} ➔ ${arr.icao}`;
+
+    const routeDesc = `Translado internacional da aeronave sob gestão da ${comp.name}. Voo de entrega técnica e translado internacional de ${dep.icao} (${dep.city || dep.name}) com destino a ${arr.icao} (${arr.city || arr.name}).`;
 
     return {
       id: contractId,
-      title: `Translado Internacional (${comp.icaoCode}): ${dep.icao} ➔ ${portIcao} ➔ ${arr.icao}`,
+      title: routeTitle,
       type: 'ferry',
       company: contractCompanyObj,
       route: {
@@ -178,7 +199,7 @@ function createSingleContract(
       aircraftCategory: 'Translado Internacional',
       rewardCredits: Math.round(distance * 12 + 10000),
       rewardXp: Math.round(distance * 0.5 + 800),
-      description: `Translado transatlântico/internacional da aeronave sob gestão da ${comp.name}. Requer vistoria e desembaraço alfandegário no Port of Entry (${portIcao}) antes da perna final para ${arr.icao}.`,
+      description: routeDesc,
       payloadInfo: 'Voo Ferry Internacional (Sem Carga)',
       urgency: 'high',
       weatherForecast: 'Perfil de rota meteorológica padrão em cruzeiro IFR.',

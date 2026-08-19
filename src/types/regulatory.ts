@@ -73,6 +73,31 @@ export interface SubmittedDocumentRecord {
   formData: Record<string, any>;
 }
 
+export interface TechnicalStopDeclaration {
+  id: string;
+  icao: string;
+  name: string;
+  country: string;
+  purpose: 'refuel' | 'crew_rest' | 'technical_inspection' | 'both';
+  etaUtc: string;
+  stayDurationHours: number;
+  fuelRequestedLiters?: number;
+}
+
+export interface OverflightPermitRecord {
+  id: string;
+  contractId: string;
+  countryIso: string;
+  countryName: string;
+  firCode: string;
+  authorityName: string;
+  permitNumber: string;
+  status: 'requested' | 'approved' | 'rejected';
+  issuedAt: string;
+  validUntil: string;
+  notes: string;
+}
+
 export interface CommsMessage {
   id: string;
   contractId: string;
@@ -83,4 +108,22 @@ export interface CommsMessage {
   isRead: boolean;
   attachedDocumentId?: string;
   type: 'request' | 'approval' | 'rejection' | 'info';
+}
+
+export interface FerryRoutePlan {
+  contractId: string;
+  originIcao: string;
+  destinationIcao: string;
+  stagingAirportIcao: string;
+  stagingAirportName: string;
+  stagingAirportCity?: string;
+  portOfEntryIcao: string;
+  portOfEntryName: string;
+  portOfEntryCity?: string;
+  isPoeRequested?: boolean;
+  hasStops: boolean;
+  technicalStops: TechnicalStopDeclaration[];
+  permits: OverflightPermitRecord[];
+  isClearedForDeparture: boolean;
+  updatedAt: string;
 }

@@ -10,13 +10,23 @@ import { MapPin, Sliders, Layers, RefreshCw, ZoomIn, Navigation, Eye, EyeOff } f
 interface FlightPlannerMapProps {
   waypoints: FlightPlanWaypoint[];
   onSelectFix: (fix: AeronauticalFix, action: 'origin' | 'destination' | 'add') => void;
+  onDeclareStop?: (fix: AeronauticalFix) => void;
   selectedFixId?: string;
+  /** Quando usado dentro de outro shape (ex: tablet operacional), remove bordas/
+   * cantos arredondados e ocupa 100% da altura do contêiner pai. */
+  embedded?: boolean;
+  /** Reserva espaço inferior para uma barra flutuante (ex: waypoints), evitando
+   * que os controles internos do mapa fiquem colados na barra. */
+  bottomInsetPx?: number;
 }
 
 export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
   waypoints,
   onSelectFix,
+  onDeclareStop,
   selectedFixId,
+  embedded = false,
+  bottomInsetPx = 0,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -367,6 +377,16 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
               <span>➕ Adicionar à Rota</span>
               <span>+</span>
             </button>
+            ${
+              fix.type === 'airport'
+                ? `
+            <button id="btn-stop-${fix.identifier}" class="w-full text-left py-1 px-2 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-bold text-[11px] border border-indigo-200 flex items-center justify-between cursor-pointer">
+              <span>📍 Declarar Escala Técnica</span>
+              <span>⚡</span>
+            </button>
+            `
+                : ''
+            }
           </div>
         </div>
       `;
@@ -385,6 +405,12 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
           });
           document.getElementById(`btn-add-${fix.identifier}`)?.addEventListener('click', () => {
             onSelectFix(fix, 'add');
+            marker.closePopup();
+          });
+          document.getElementById(`btn-stop-${fix.identifier}`)?.addEventListener('click', () => {
+            if (onDeclareStop) {
+              onDeclareStop(fix);
+            }
             marker.closePopup();
           });
         }, 50);
@@ -424,7 +450,13 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
   };
 
   return (
-    <div className="relative w-full h-[450px] md:h-[550px] lg:h-[620px] rounded-xl overflow-hidden border border-slate-200/90 shadow-sm bg-slate-900">
+    <div
+      className={
+        embedded
+          ? 'relative w-full h-full overflow-hidden bg-slate-900'
+          : 'relative w-full h-[450px] md:h-[550px] lg:h-[620px] rounded-xl overflow-hidden border border-slate-200/90 shadow-sm bg-slate-900'
+      }
+    >
       {/* Map Element */}
       <div ref={mapContainerRef} className="w-full h-full z-0"></div>
 
@@ -583,16 +615,24 @@ export const FlightPlannerMap: React.FC<FlightPlannerMapProps> = ({
 
       {/* Loading Indicator on Map */}
       {isLoadingFixes && (
-        <div className="absolute bottom-3 left-3 z-10 bg-slate-900/90 text-sky-400 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-700/80 shadow-md flex items-center gap-2 pointer-events-none">
+        <div
+          className="absolute left-3 z-10 bg-slate-900/90 text-sky-400 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-700/80 shadow-md flex items-center gap-2 pointer-events-none"
+          style={{ bottom: 12 + bottomInsetPx }}
+        >
           <RefreshCw className="w-3 h-3 animate-spin text-sky-400" />
           <span>Carregando dados AIRAC da região...</span>
         </div>
       )}
 
       {/* Map Footer Info */}
-      <div className="absolute bottom-3 right-3 z-10 bg-slate-900/80 text-slate-400 text-[9px] font-mono px-2 py-0.5 rounded border border-slate-800 pointer-events-none">
-        Leaflet | © CARTO © OpenStreetMap • AIRAC.NET
-      </div>
+      {!embedded && (
+        <div
+          className="absolute right-3 z-10 bg-slate-900/80 text-slate-400 text-[9px] font-mono px-2 py-0.5 rounded border border-slate-800 pointer-events-none"
+          style={{ bottom: 12 + bottomInsetPx }}
+        >
+          Leaflet | © CARTO © OpenStreetMap • AIRAC.NET
+        </div>
+      )}
     </div>
   );
 };

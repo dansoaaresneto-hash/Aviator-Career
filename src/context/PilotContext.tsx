@@ -13,6 +13,11 @@ import {
   RequiredDocument,
   SubmittedDocumentRecord,
   CommsMessage,
+  TechnicalStopDeclaration,
+  OverflightPermitRecord,
+  FerryRoutePlan,
+  CareerMode,
+  PilotLicenseId,
 } from '../types';
 import { INITIAL_ADMIN_COMPANIES } from '../data/initialCompanies';
 import { AIRCRAFT_CATALOG } from '../data/initialFleet';
@@ -25,6 +30,12 @@ import {
 } from '../data/initialRegulatoryData';
 import { generateContractsFromCompanies } from '../utils/missionGenerator';
 import { fetchMissionAirportPool, updateAirportInCache } from '../services/airportsService';
+import {
+  findOptimalStagingAirport,
+  findOptimalPortOfEntry,
+  generateRouteOverflightPermits,
+} from '../utils/regulatoryEngine';
+import { calculateLicenseProgression, getLicenseById } from '../utils/licenseEngine';
 import { useTelemetry } from './TelemetryContext';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -57,6 +68,12 @@ interface PilotContextType {
   setSearchQuery: (query: string) => void;
   selectedAircraftFilter: string;
   setSelectedAircraftFilter: (aircraft: string) => void;
+  // Career Mode & Licenses
+  careerMode: CareerMode;
+  setCareerMode: (mode: CareerMode) => void;
+  promotePilotLicense: () => void;
+  isCareerModeModalOpen: boolean;
+  setIsCareerModeModalOpen: (open: boolean) => void;
   // Admin Company Management
   adminCompanies: AdminCompany[];
   saveCompany: (company: AdminCompany) => void;
@@ -92,11 +109,17 @@ interface PilotContextType {
   approveDocumentInstant: (contractId: string, documentId: string) => void;
   commsMessages: CommsMessage[];
   markCommsMessageRead: (messageId: string) => void;
+  // Ferry Staging, Technical Stops & Overflight Permits
+  ferryRoutePlans: Record<string, FerryRoutePlan>;
+  updateFerryTechnicalStops: (contractId: string, stops: TechnicalStopDeclaration[]) => void;
+  requestPortOfEntry: (contractId: string) => Promise<void>;
+  requestOverflightPermits: (contractId: string) => Promise<void>;
+  getFerryRoutePlan: (contractId: string) => FerryRoutePlan;
 }
 
 const INITIAL_PROFILE: PilotProfile = {
   name: 'Gabriel Silva',
-  title: 'Piloto Aluno',
+  title: 'Licença de Aluno Piloto',
   credits: 0, // Starts at 0 credits as requested
   xp: 0,
   level: 1,
@@ -104,6 +127,9 @@ const INITIAL_PROFILE: PilotProfile = {
   completedFlights: 0,
   successfulLandings: 0,
   preferredCallsign: 'PR-AV1',
+  careerMode: 'full_career',
+  licenseId: 'student_pilot',
+  licenseIssuedAt: new Date().toISOString(),
 };
 
 const PilotContext = createContext<PilotContextType | undefined>(undefined);
@@ -116,13 +142,55 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const saved = localStorage.getItem('aviator_pilot_profile');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return {
+          ...INITIAL_PROFILE,
+          ...parsed,
+          careerMode: parsed.careerMode || 'full_career',
+          licenseId: parsed.licenseId || 'student_pilot',
+        };
       } catch (e) {
         console.error(e);
       }
     }
     return INITIAL_PROFILE;
   });
+
+  const [isCareerModeModalOpen, setIsCareerModeModalOpen] = useState<boolean>(() => {
+    const hasChosenMode = localStorage.getItem('aviator_career_mode_selected');
+    return !hasChosenMode;
+  });
+
+  const setCareerMode = (mode: CareerMode) => {
+    setProfile((prev) => {
+      const updated = {
+        ...prev,
+        careerMode: mode,
+      };
+      localStorage.setItem('aviator_pilot_profile', JSON.stringify(updated));
+      return updated;
+    });
+    localStorage.setItem('aviator_career_mode_selected', 'true');
+    setIsCareerModeModalOpen(false);
+  };
+
+  const promotePilotLicense = () => {
+    const progression = calculateLicenseProgression(profile, logbook);
+    if (progression.canPromote && progression.nextLicense) {
+      const nextTier = progression.nextLicense;
+      setProfile((prev) => {
+        const updated: PilotProfile = {
+          ...prev,
+          licenseId: nextTier.id,
+          title: nextTier.name,
+          level: Math.max(prev.level, nextTier.order),
+          licenseIssuedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('aviator_pilot_profile', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  };
 
   const [adminCompanies, setAdminCompanies] = useState<AdminCompany[]>(() => {
     const saved = localStorage.getItem('aviator_admin_companies');
@@ -142,6 +210,21 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [requiredDocuments, setRequiredDocuments] = useState<RequiredDocument[]>([]);
   const [submittedDocuments, setSubmittedDocuments] = useState<SubmittedDocumentRecord[]>([]);
   const [commsMessages, setCommsMessages] = useState<CommsMessage[]>([]);
+  const [ferryRoutePlans, setFerryRoutePlans] = useState<Record<string, FerryRoutePlan>>(() => {
+    const saved = localStorage.getItem('aviator_ferry_route_plans');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('aviator_ferry_route_plans', JSON.stringify(ferryRoutePlans));
+  }, [ferryRoutePlans]);
 
   // Carrega tabelas regulatórias do Supabase ao iniciar
   useEffect(() => {
@@ -302,14 +385,21 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Regenera as missões sempre que a lista de empresas OU a base de
-  // aeroportos mudar (a base só muda uma vez, quando termina de carregar).
+  // Regenera as missões sempre que a lista de empresas, a base de aeroportos,
+  // ou a estrutura regulatória (países, zonas, órgãos, POEs) mudar.
   useEffect(() => {
     localStorage.setItem('aviator_admin_companies', JSON.stringify(adminCompanies));
     if (airportPool.length > 0) {
-      setContracts(generateContractsFromCompanies(adminCompanies, airportPool));
+      setContracts(
+        generateContractsFromCompanies(adminCompanies, airportPool, {
+          countriesInfo,
+          regulatoryBodies,
+          regulatoryZones,
+          airportPool,
+        })
+      );
     }
-  }, [adminCompanies, airportPool]);
+  }, [adminCompanies, airportPool, countriesInfo, regulatoryBodies, regulatoryZones]);
 
   const refreshAirportsDatabase = async () => {
     setAirportsLoading(true);
@@ -342,7 +432,14 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const regenerateMissions = () => {
     if (airportPool.length === 0) return; // base ainda carregando — o efeito acima cuida disso assim que chegar
-    setContracts(generateContractsFromCompanies(adminCompanies, airportPool));
+    setContracts(
+      generateContractsFromCompanies(adminCompanies, airportPool, {
+        countriesInfo,
+        regulatoryBodies,
+        regulatoryZones,
+        airportPool,
+      })
+    );
   };
 
   const [adminAircrafts, setAdminAircrafts] = useState<AircraftModel[]>(() => {
@@ -384,7 +481,20 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
   const [activeContract, setActiveContract] = useState<Contract | null>(() => {
     const saved = localStorage.getItem('aviator_active_contract');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed: Contract = JSON.parse(saved);
+        if (parsed && parsed.route) {
+          if (parsed.type === 'ferry' && parsed.title && parsed.title.includes('(Exit)')) {
+            parsed.title = `Translado Internacional (${parsed.company?.icaoCode || 'FERRY'}): ${parsed.route.departureIcao} ➔ ${parsed.route.arrivalIcao}`;
+          }
+        }
+        return parsed;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return null;
   });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -638,6 +748,12 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!activeContract) return;
 
     if (!flightPhase || flightPhase === 'briefing') {
+      if (activeContract.type === 'ferry') {
+        const manifestDoc = requiredDocuments.find((d) => d.code === 'EAPIS_MANIFEST');
+        if (manifestDoc) {
+          approveDocumentInstant(activeContract.id, manifestDoc.id);
+        }
+      }
       setFlightPhase('taxi');
       setFlightProgress((prev) => Math.max(prev, 25));
       return;
@@ -650,33 +766,148 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     if (flightPhase === 'cruise') {
-      const portOfEntryIcao = activeContract.ferryDossier?.portOfEntryIcao;
-      const targetArrivalIcao = activeContract.route.arrivalIcao;
+      if (activeContract.type === 'ferry') {
+        const plan = getFerryRoutePlan(activeContract.id);
+        const stagingIcao = plan.stagingAirportIcao;
+        const portOfEntryIcao = plan.portOfEntryIcao || activeContract.ferryDossier?.portOfEntryIcao;
+        const targetArrivalIcao = activeContract.route.arrivalIcao;
 
-      // If ferry flight with a Port of Entry stop that hasn't been visited yet
-      if (
-        portOfEntryIcao &&
-        currentLocationIcao !== portOfEntryIcao &&
-        portOfEntryIcao !== targetArrivalIcao
-      ) {
-        setFlightPhase('intermediate_landing');
-        setCurrentLocationIcao(portOfEntryIcao);
-        setIntermediateStops((prev) => {
-          if (prev.some((s) => s.icao === portOfEntryIcao)) return prev;
-          return [...prev, { icao: portOfEntryIcao, timestamp: new Date().toISOString() }];
+        // Step 1: Has aircraft visited Staging Airport (Port of Exit)?
+        if (
+          stagingIcao &&
+          stagingIcao !== activeContract.route.departureIcao &&
+          currentLocationIcao !== stagingIcao &&
+          !intermediateStops.some((s) => s.icao === stagingIcao)
+        ) {
+          const manifestDoc = requiredDocuments.find((d) => d.code === 'EAPIS_MANIFEST');
+          if (manifestDoc) {
+            approveDocumentInstant(activeContract.id, manifestDoc.id);
+          }
+          setFlightPhase('intermediate_landing');
+          setCurrentLocationIcao(stagingIcao);
+          setIntermediateStops((prev) => {
+            if (prev.some((s) => s.icao === stagingIcao)) return prev;
+            return [...prev, { icao: stagingIcao, timestamp: new Date().toISOString() }];
+          });
+          setFlightProgress(50);
+          return;
+        }
+
+        // Step 2: Has aircraft visited Port of Entry?
+        if (
+          portOfEntryIcao &&
+          currentLocationIcao !== portOfEntryIcao &&
+          !intermediateStops.some((s) => s.icao === portOfEntryIcao) &&
+          portOfEntryIcao !== targetArrivalIcao
+        ) {
+          // Unlocks POE and permits automatically on Admin advance so POE is never "Desconhecido"
+          setFerryRoutePlans((prev) => {
+            const current = prev[activeContract.id] || plan;
+            const permits =
+              current.permits && current.permits.length > 0
+                ? current.permits
+                : generateRouteOverflightPermits(
+                    activeContract.id,
+                    plan.originIcao,
+                    plan.destinationIcao,
+                    plan.stagingAirportIcao,
+                    plan.portOfEntryIcao,
+                    countriesInfo,
+                    regulatoryBodies,
+                    regulatoryZones,
+                    airportPool
+                  );
+            return {
+              ...prev,
+              [activeContract.id]: {
+                ...current,
+                isPoeRequested: true,
+                isClearedForDeparture: true,
+                permits,
+                updatedAt: new Date().toISOString(),
+              },
+            };
+          });
+
+          setFlightPhase('intermediate_landing');
+          setCurrentLocationIcao(portOfEntryIcao);
+          setIntermediateStops((prev) => {
+            if (prev.some((s) => s.icao === portOfEntryIcao)) return prev;
+            return [...prev, { icao: portOfEntryIcao, timestamp: new Date().toISOString() }];
+          });
+          setFlightProgress(75);
+          return;
+        }
+
+        // Step 3: Final destination
+        setFerryRoutePlans((prev) => {
+          const current = prev[activeContract.id] || plan;
+          return {
+            ...prev,
+            [activeContract.id]: {
+              ...current,
+              isPoeRequested: true,
+              isClearedForDeparture: true,
+              updatedAt: new Date().toISOString(),
+            },
+          };
         });
-        setFlightProgress(75);
-      } else {
-        // Direct flight or second leg -> landed at final destination
         setFlightPhase('landed');
         setCurrentLocationIcao(targetArrivalIcao);
         setFlightProgress(100);
+        return;
       }
+
+      // Standard non-ferry flight
+      const targetArrivalIcao = activeContract.route.arrivalIcao;
+      setFlightPhase('landed');
+      setCurrentLocationIcao(targetArrivalIcao);
+      setFlightProgress(100);
       return;
     }
 
     if (flightPhase === 'intermediate_landing') {
-      // From Port of Entry/scale -> advance to taxi for leg 2
+      if (activeContract.type === 'ferry') {
+        const plan = getFerryRoutePlan(activeContract.id);
+        if (currentLocationIcao === plan.stagingAirportIcao) {
+          // Leaving Staging Airport: automatically ensure POE is requested and permits are active
+          setFerryRoutePlans((prev) => {
+            const current = prev[activeContract.id] || plan;
+            const permits =
+              current.permits && current.permits.length > 0
+                ? current.permits
+                : generateRouteOverflightPermits(
+                    activeContract.id,
+                    plan.originIcao,
+                    plan.destinationIcao,
+                    plan.stagingAirportIcao,
+                    plan.portOfEntryIcao,
+                    countriesInfo,
+                    regulatoryBodies,
+                    regulatoryZones,
+                    airportPool
+                  );
+            return {
+              ...prev,
+              [activeContract.id]: {
+                ...current,
+                isPoeRequested: true,
+                isClearedForDeparture: true,
+                permits,
+                updatedAt: new Date().toISOString(),
+              },
+            };
+          });
+          setFlightPhase('taxi');
+          setFlightProgress((prev) => Math.max(prev, 60));
+          return;
+        }
+        if (currentLocationIcao === plan.portOfEntryIcao) {
+          setFlightPhase('taxi');
+          setFlightProgress((prev) => Math.max(prev, 85));
+          return;
+        }
+      }
       setFlightPhase('taxi');
       setFlightProgress((prev) => Math.max(prev, 80));
       return;
@@ -774,6 +1005,7 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIntermediateStops([]);
     setLogbook([]);
     localStorage.removeItem('aviator_pilot_profile');
+    localStorage.removeItem('aviator_career_mode_selected');
     localStorage.removeItem('aviator_admin_companies');
     localStorage.removeItem('aviator_active_contract');
     localStorage.removeItem('aviator_flight_phase');
@@ -781,6 +1013,7 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.removeItem('aviator_current_location');
     localStorage.removeItem('aviator_intermediate_stops');
     localStorage.removeItem('aviator_logbook');
+    setIsCareerModeModalOpen(true);
     setActiveTab('overview');
   };
 
@@ -1056,12 +1289,34 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
 
         if (body) {
+          const isEapis = doc?.code === 'EAPIS_MANIFEST';
+          const isDI = doc?.code === 'DI_IMPORT';
+          const dossier = activeContract?.ferryDossier;
+
+          let approvalContent = `A autorização foi emitida com sucesso pela ${body.shortName}. O selo de liberação e o carimbo de trânsito foram vinculados ao seu dossiê de voo.`;
+          
+          if (isEapis) {
+            const plan = getFerryRoutePlan(contractId);
+            approvalContent = `[CBP eAPIS APPROVED 14:22Z] Protocolo Oficial de Saída: CBP-${Math.floor(10000 + Math.random() * 90000)}-US.
+Staging Airport Designado (Port of Exit): ${plan.stagingAirportIcao} (${plan.stagingAirportName}).
+INSTRUÇÃO OBRIGATÓRIA: O piloto deverá realizar pouso técnico no Staging Airport ${plan.stagingAirportIcao} para encerramento formal dos trâmites aduaneiros de exportação antes de ingressar no espaço aéreo internacional.
+O Port of Entry de destino somente será revelado após a obtenção da Autorização de Saída do País neste aeroporto.`;
+          } else if (isDI) {
+            approvalContent = `[RECEITA FEDERAL & RAB HOMOLOGADO] Processo de Importação DI deferido!
+O Certificado de Verificação de Navegabilidade (CNAV) foi emitido e a aeronave foi inscrita no Registro Aeronáutico Brasileiro sob as marcas definitivas: ${dossier?.newRegistration || 'PS-GFA'}.
+Aeronave liberada para voo de entrega final até a base do operador.`;
+          }
+
           const approvalMsg: CommsMessage = {
             id: `msg_app_${Date.now()}`,
             contractId,
             regulatoryBodyId: body.id,
-            title: `✓ APROVADO: ${doc?.name || 'Documento Oficial'}`,
-            content: `A autorização foi emitida com sucesso pela ${body.shortName}. O selo de liberação e o carimbo de trânsito foram vinculados ao seu dossiê de voo. Boa viagem!`,
+            title: isEapis
+              ? `✓ eAPIS APROVADO: Staging Airport Designado`
+              : isDI
+              ? `✓ DI APROVADA: Matrícula ${dossier?.newRegistration || 'BR'} Registrada no RAB`
+              : `✓ APROVADO: ${doc?.name || 'Documento Oficial'}`,
+            content: approvalContent,
             timestamp: approvedAt,
             isRead: false,
             attachedDocumentId: documentId,
@@ -1090,6 +1345,185 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }, delayMinutes * 60 * 1000);
     }
+  };
+
+  // Helper de Plano de Rota e Escalas de Translado
+  const getFerryRoutePlan = (contractId: string): FerryRoutePlan => {
+    if (ferryRoutePlans[contractId]) {
+      return ferryRoutePlans[contractId];
+    }
+    const contract = contracts.find((c) => c.id === contractId) || activeContract;
+    const dossier = contract?.ferryDossier;
+
+    const depIcao = contract?.route.departureIcao || 'KFXE';
+    const arrIcao = contract?.route.arrivalIcao || 'SBGR';
+
+    const depAirport = airportPool.find((a) => a.icao === depIcao) || {
+      icao: depIcao,
+      name: contract?.route.departureName || depIcao,
+      city: contract?.route.departureCity || '',
+      country: dossier?.originCountryCode || 'US',
+      lat: 26.197,
+      lng: -80.17,
+      elevationFt: 13,
+      hasPavedRunway: true,
+      isPortOfEntry: true,
+    };
+
+    const arrAirport = airportPool.find((a) => a.icao === arrIcao) || {
+      icao: arrIcao,
+      name: contract?.route.arrivalName || arrIcao,
+      city: contract?.route.arrivalCity || '',
+      country: dossier?.destinationCountryCode || 'BR',
+      lat: -23.435,
+      lng: -46.473,
+      elevationFt: 2459,
+      hasPavedRunway: true,
+      isPortOfEntry: true,
+    };
+
+    const optimalStaging = findOptimalStagingAirport(depAirport, arrAirport, airportPool);
+    const optimalPoe = findOptimalPortOfEntry(optimalStaging, arrAirport, airportPool);
+
+    const stagingAirportIcao = optimalStaging.icao;
+    const stagingAirportName = optimalStaging.name;
+    const stagingAirportCity = optimalStaging.city;
+
+    const portOfEntryIcao = dossier?.portOfEntryIcao || optimalPoe.icao;
+    const portOfEntryName = dossier?.portOfEntryName || optimalPoe.name;
+    const portOfEntryCity = dossier?.portOfEntryCity || optimalPoe.city;
+
+    const defaultPlan: FerryRoutePlan = {
+      contractId,
+      originIcao: depIcao,
+      destinationIcao: arrIcao,
+      stagingAirportIcao,
+      stagingAirportName,
+      stagingAirportCity,
+      portOfEntryIcao,
+      portOfEntryName,
+      portOfEntryCity,
+      hasStops: false,
+      technicalStops: [],
+      permits: [],
+      isClearedForDeparture: false,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return defaultPlan;
+  };
+
+  const updateFerryTechnicalStops = (contractId: string, stops: TechnicalStopDeclaration[]) => {
+    setFerryRoutePlans((prev) => {
+      const current = prev[contractId] || getFerryRoutePlan(contractId);
+      const updated: FerryRoutePlan = {
+        ...current,
+        hasStops: stops.length > 0,
+        technicalStops: stops,
+        updatedAt: new Date().toISOString(),
+      };
+      return { ...prev, [contractId]: updated };
+    });
+  };
+
+  const requestPortOfEntry = async (contractId: string) => {
+    const plan = getFerryRoutePlan(contractId);
+
+    setFerryRoutePlans((prev) => {
+      const current = prev[contractId] || plan;
+      return {
+        ...prev,
+        [contractId]: {
+          ...current,
+          isPoeRequested: true,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+
+    const poeMsg: CommsMessage = {
+      id: `msg_poe_${Date.now()}`,
+      contractId,
+      regulatoryBodyId: 'body_rfb_br',
+      title: `📍 Port of Entry Homologado: ${plan.portOfEntryIcao}`,
+      content: `[DESPACHO ADUANEIRO INTERNACIONAL] O Port of Entry obrigatório para ingresso no país de destino foi oficialmente designado: ${plan.portOfEntryIcao} (${plan.portOfEntryName}${plan.portOfEntryCity ? ` - ${plan.portOfEntryCity}` : ''}). Você agora está autorizado a planejar e declarar escalas técnicas (se necessárias) e solicitar as Autorizações de Sobrevoo e Pouso (Permits).`,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      type: 'approval',
+    };
+
+    setCommsMessages((prev) => [poeMsg, ...prev]);
+  };
+
+  const requestOverflightPermits = async (contractId: string) => {
+    const plan = getFerryRoutePlan(contractId);
+    const contract = contracts.find((c) => c.id === contractId) || activeContract;
+
+    // A Autorização de Saída do País só pode ser solicitada com o Manifesto eAPIS aprovado e com
+    // a aeronave fisicamente pousada no Staging Airport designado.
+    const manifestDoc = requiredDocuments.find((d) => d.code === 'EAPIS_MANIFEST');
+    const manifestApproved = manifestDoc
+      ? submittedDocuments.some(
+          (s) => s.contractId === contractId && s.documentId === manifestDoc.id && s.status === 'approved'
+        )
+      : false;
+    const isAtStagingAirport = !!currentLocationIcao && currentLocationIcao === plan.stagingAirportIcao;
+
+    if (!manifestApproved || !isAtStagingAirport) {
+      return;
+    }
+
+    // Gera autorizações de sobrevoo dinamicamente conforme as regras, zonas e países configurados no Admin
+    const permits = generateRouteOverflightPermits(
+      contractId,
+      plan.originIcao,
+      plan.destinationIcao,
+      plan.stagingAirportIcao,
+      plan.portOfEntryIcao,
+      countriesInfo,
+      regulatoryBodies,
+      regulatoryZones,
+      airportPool
+    );
+
+    setFerryRoutePlans((prev) => {
+      const current = prev[contractId] || plan;
+      return {
+        ...prev,
+        [contractId]: {
+          ...current,
+          permits,
+          isPoeRequested: true,
+          isClearedForDeparture: true,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+
+    // Envia mensagem no CommsHub
+    const permitMsg: CommsMessage = {
+      id: `msg_pmt_${Date.now()}`,
+      contractId,
+      regulatoryBodyId: 'body_faa_us',
+      title: `✈️ Autorização de Saída do País Concedida`,
+      content: `Todas as ${permits.length} Autorizações de Sobrevoo e Pouso Técnico (Permits) solicitadas para o trajeto internacional foram deferidas pelas autoridades aeronáuticas em conformidade com as zonas regulatórias. Os códigos de autorização foram anexados ao plano de voo.`,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      type: 'approval',
+    };
+
+    const poeRevealMsg: CommsMessage = {
+      id: `msg_poe_${Date.now()}`,
+      contractId,
+      regulatoryBodyId: 'body_rfb_br',
+      title: `📍 Port of Entry de Destino Confirmado`,
+      content: `Com a saída do país autorizada, prossiga diretamente para o Port of Entry designado para desembaraço aduaneiro de importação: ${plan.portOfEntryIcao} (${plan.portOfEntryName}).`,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      type: 'info',
+    };
+
+    setCommsMessages((prev) => [poeRevealMsg, permitMsg, ...prev]);
   };
 
   const approveDocumentInstant = async (contractId: string, documentId: string) => {
@@ -1228,6 +1662,11 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setSearchQuery,
         selectedAircraftFilter,
         setSelectedAircraftFilter,
+        careerMode: profile.careerMode || 'full_career',
+        setCareerMode,
+        promotePilotLicense,
+        isCareerModeModalOpen,
+        setIsCareerModeModalOpen,
         adminCompanies,
         saveCompany,
         deleteCompany,
@@ -1259,6 +1698,11 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         approveDocumentInstant,
         commsMessages,
         markCommsMessageRead,
+        ferryRoutePlans,
+        updateFerryTechnicalStops,
+        requestPortOfEntry,
+        requestOverflightPermits,
+        getFerryRoutePlan,
       }}
     >
       {children}

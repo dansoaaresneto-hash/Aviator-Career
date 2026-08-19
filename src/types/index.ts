@@ -121,13 +121,17 @@ export interface PilotProfile {
   completedFlights: number;
   successfulLandings: number;
   preferredCallsign: string;
+  careerMode?: 'full_career' | 'free_career';
+  licenseId?: 'student_pilot' | 'ppl' | 'cpl' | 'atpl_master_ferry';
+  licenseIssuedAt?: string;
 }
 
-export type ActiveTab = 'overview' | 'missions' | 'active-flight' | 'flight-planner' | 'live-map' | 'fleet' | 'logbook' | 'profile' | 'settings' | 'connector' | 'admin-companies';
+export type ActiveTab = 'overview' | 'missions' | 'career' | 'active-flight' | 'flight-planner' | 'live-map' | 'fleet' | 'logbook' | 'profile' | 'settings' | 'connector' | 'admin-companies';
 
 export * from './companyAdmin';
 export * from './telemetry';
 export * from './regulatory';
+export * from './license';
 
 export interface FlightPlanWaypoint {
   id: string;

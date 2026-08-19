@@ -7,6 +7,7 @@ import { FlightPlanRoutePanel } from './FlightPlanRoutePanel';
 import { FlightPlanBriefingPanel } from './FlightPlanBriefingPanel';
 import { MetarBriefingPanel } from './MetarBriefingPanel';
 import { ExportFlightPlanModal } from './ExportFlightPlanModal';
+import { DeclareTechnicalStopModal } from '../Flight/operations/DeclareTechnicalStopModal';
 import {
   Compass,
   Radio,
@@ -23,6 +24,7 @@ export const FlightPlannerView: React.FC = () => {
   const [airacCycle, setAiracCycle] = useState<AiracCycleInfo | null>(null);
   const [originFix, setOriginFix] = useState<AeronauticalFix | null>(OFFLINE_AERONAUTICAL_FIXES[0]); // SBGR
   const [destFix, setDestFix] = useState<AeronauticalFix | null>(OFFLINE_AERONAUTICAL_FIXES[1]); // SBSP
+  const [declaringStopFix, setDeclaringStopFix] = useState<AeronauticalFix | null>(null);
 
   const [waypoints, setWaypoints] = useState<FlightPlanWaypoint[]>([
     {
@@ -176,6 +178,7 @@ export const FlightPlannerView: React.FC = () => {
         <FlightPlannerMap
           waypoints={waypoints}
           onSelectFix={handleMapSelectFix}
+          onDeclareStop={(fix) => setDeclaringStopFix(fix)}
         />
       </div>
 
@@ -200,6 +203,16 @@ export const FlightPlannerView: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Declare Technical Stop Modal */}
+      <DeclareTechnicalStopModal
+        isOpen={Boolean(declaringStopFix)}
+        airportFix={declaringStopFix}
+        onClose={() => setDeclaringStopFix(null)}
+        onAddToFlightPlan={(fix) => {
+          handleMapSelectFix(fix, 'add');
+        }}
+      />
 
       {/* Export Modal */}
       <ExportFlightPlanModal

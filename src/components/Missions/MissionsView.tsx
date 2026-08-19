@@ -104,7 +104,14 @@ export const MissionsView: React.FC = () => {
       )}
 
       {/* Contract Detail Briefing Modal */}
-      {selectedContractForPreview && selectedContractForPreview.type === 'ferry' ? (
+      {selectedContractForPreview &&
+      selectedContractForPreview.type === 'ferry' &&
+      (Boolean(selectedContractForPreview.ferryDossier) ||
+        (selectedContractForPreview.route.departureCountry &&
+          selectedContractForPreview.route.arrivalCountry &&
+          selectedContractForPreview.route.departureCountry !== selectedContractForPreview.route.arrivalCountry) ||
+        selectedContractForPreview.aircraftCategory?.toLowerCase().includes('internacional') ||
+        selectedContractForPreview.title?.toLowerCase().includes('translado internacional')) ? (
         <FerryMissionModal
           contract={selectedContractForPreview}
           onClose={() => setSelectedContractForPreview(null)}

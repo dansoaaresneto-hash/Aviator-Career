@@ -5,6 +5,8 @@ import { FerryDossierCard } from './FerryDossierCard';
 import { FerryFinancialSummary } from './FerryFinancialSummary';
 import { generateFerryAuthorizationPdf } from '../../utils/generateFerryAuthorizationPdf';
 import { CompanyLogoBadge } from '../Common/CompanyLogoBadge';
+import { getCountryName } from '../../utils/countryUtils';
+import { checkContractEligibility } from '../../utils/licenseEngine';
 import {
   X,
   Plane,
@@ -17,7 +19,10 @@ import {
   ArrowRight,
   ShieldCheck,
   Coins,
-  Zap
+  Zap,
+  Globe,
+  Lock,
+  Award,
 } from 'lucide-react';
 
 interface FerryMissionModalProps {
@@ -26,32 +31,61 @@ interface FerryMissionModalProps {
 }
 
 export const FerryMissionModal: React.FC<FerryMissionModalProps> = ({ contract, onClose }) => {
-  const { profile, acceptContract } = usePilot();
+  const { profile, logbook, acceptContract, setActiveTab } = usePilot();
 
-  // Extract dossier or provide fallback for ferry contracts
+  const depCountryName = getCountryName(
+    contract.route.departureIcao,
+    contract.route.departureCity,
+    contract.route.departureCountry
+  );
+  const arrCountryName = getCountryName(
+    contract.route.arrivalIcao,
+    contract.route.arrivalCity,
+    contract.route.arrivalCountry
+  );
+
+  // Extract dossier or dynamically construct fallback based on the actual contract
+  const isDepUS = contract.route.departureCountry === 'US' || contract.route.departureCountry?.toLowerCase().includes('estados unidos');
   const dossier: FerryDossier = contract.ferryDossier || {
     aircraftModel: contract.requiredAircraft || 'TBM 930',
-    manufacturer: 'Daher Aerospace',
-    msn: 'MSN 1284',
-    originalRegistration: 'CS-DEX',
-    newRegistration: 'PR-SGA',
+    manufacturer: isDepUS ? 'Textron Aviation' : 'Daher Aerospace',
+    msn: `MSN ${1000 + Math.floor(Math.random() * 500)}`,
+    originalRegistration: isDepUS ? 'N482TX' : 'CS-TEX',
+    newRegistration: 'PR-TEX',
     mtowKg: 3354,
-    currentOwner: `${contract.company.name} / Internacional`,
-    originCountryCode: 'PT',
-    originCountryName: 'Portugal',
-    destinationCountryCode: 'BR',
-    destinationCountryName: 'Brasil',
+    currentOwner: `${contract.company.name} Global Leasing`,
+    originCountryCode: contract.route.departureCountry || 'US',
+    originCountryName: depCountryName,
+    destinationCountryCode: contract.route.arrivalCountry || 'BR',
+    destinationCountryName: arrCountryName,
     portOfEntryIcao: 'SBSG',
-    portOfEntryName: 'Aeroporto Internacional de Natal',
-    portOfEntryCity: 'Natal - RN (Brasil)',
+    portOfEntryName: 'Aeroporto Internacional de Entrada',
+    portOfEntryCity: `${arrCountryName}`,
     exportFeeCr: 1500,
     nationalizationFeeCr: 3500,
   };
 
+  const eligibility = checkContractEligibility(contract, profile, logbook);
+
   const handleAccept = () => {
+    if (!eligibility.isEligible) return;
     acceptContract(contract);
     onClose();
   };
+
+  const handleGoToCareer = () => {
+    onClose();
+    setActiveTab('career');
+  };
+
+  const isTransatlantic = (
+    (['PT', 'ES', 'FR', 'UK', 'GB', 'DE', 'IT', 'CV'].includes(dossier.originCountryCode.toUpperCase()) && ['BR', 'US', 'AR', 'CL', 'CO', 'MX'].includes(dossier.destinationCountryCode.toUpperCase())) ||
+    (['BR', 'US', 'AR', 'CL', 'CO', 'MX'].includes(dossier.originCountryCode.toUpperCase()) && ['PT', 'ES', 'FR', 'UK', 'GB', 'DE', 'IT', 'CV'].includes(dossier.destinationCountryCode.toUpperCase()))
+  );
+
+  const routeSubtitle = isTransatlantic
+    ? 'Rota do Translado Transatlântico & Escalas'
+    : 'Rota do Translado Internacional & Escalas';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-fadeIn">
@@ -68,8 +102,9 @@ export const FerryMissionModal: React.FC<FerryMissionModalProps> = ({ contract, 
             />
             <div>
               <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[11px] font-extrabold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
-                  Translado Internacional de Aeronave
+                <span className="text-[11px] font-extrabold text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 flex items-center gap-1">
+                  <Globe className="w-3 h-3 text-sky-600" />
+                  Translado Internacional de Aeronave ({dossier.originCountryCode} ➔ {dossier.destinationCountryCode})
                 </span>
                 <span className="text-xs text-slate-500 font-medium">{contract.company.name}</span>
               </div>
@@ -91,7 +126,7 @@ export const FerryMissionModal: React.FC<FerryMissionModalProps> = ({ contract, 
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-4 text-white shadow-md">
             <div className="text-[10px] font-bold text-sky-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Navigation className="w-3.5 h-3.5 text-sky-400" />
-              Rota do Translado Transatlântico & Escalas
+              {routeSubtitle}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center text-center md:text-left">
@@ -109,7 +144,7 @@ export const FerryMissionModal: React.FC<FerryMissionModalProps> = ({ contract, 
                   <MapPin className="w-3 h-3 text-amber-400" /> Port of Entry / Escala
                 </span>
                 <div className="text-lg font-black text-amber-300 font-mono mt-0.5">{dossier.portOfEntryIcao}</div>
-                <div className="text-xs text-slate-300 font-semibold truncate">{dossier.portOfEntryCity}</div>
+                <div className="text-xs text-slate-300 font-semibold truncate">{dossier.portOfEntryCity || dossier.portOfEntryName}</div>
                 <div className="text-[10px] text-amber-300/80 font-medium">Vistoria & Nacionalização ({dossier.newRegistration})</div>
               </div>
 
@@ -174,32 +209,61 @@ export const FerryMissionModal: React.FC<FerryMissionModalProps> = ({ contract, 
             playerCredits={profile.credits}
           />
 
+          {/* Locked Contract Banner if not eligible */}
+          {!eligibility.isEligible && (
+            <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1.5 shadow-sm">
+              <div className="font-extrabold flex items-center gap-1.5 text-amber-900">
+                <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Translado Bloqueado pela Licença do Piloto ({eligibility.requiredLicense?.name || 'Licença Superior'})</span>
+              </div>
+              <p className="leading-relaxed text-amber-800">
+                {eligibility.reason}
+              </p>
+              {eligibility.unlockRequirementHint && (
+                <p className="text-[11px] text-amber-700 font-medium pt-1 border-t border-amber-200/80">
+                  💡 <strong>Como desbloquear:</strong> {eligibility.unlockRequirementHint}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Automated Telemetry Tracking Guidance */}
           <div className="p-3 bg-sky-50 rounded-xl border border-sky-200/80 text-xs text-sky-900 flex items-start gap-2.5">
             <ShieldCheck className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
             <div>
               <strong className="block text-slate-900 mb-0.5">Rastreamento Automático via Simulador (MSFS):</strong>
-              Ao aceitar esta missão, inicie seu voo normalmente em <strong>{contract.route.departureIcao}</strong>. O sistema detectará automaticamente quando você pousar na escala de vistoria em <strong>{dossier.portOfEntryIcao}</strong> para os trâmites do registro brasileiro, e posteriormente no pouso final em <strong>{contract.route.arrivalIcao}</strong>.
+              Ao aceitar esta missão, inicie seu voo normalmente em <strong>{contract.route.departureIcao}</strong>. O sistema detectará automaticamente quando você pousar na escala de vistoria em <strong>{dossier.portOfEntryIcao}</strong> para os trâmites regulatórios de entrada ({dossier.destinationCountryName}), e posteriormente no pouso final em <strong>{contract.route.arrivalIcao}</strong>.
             </div>
           </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-200/80 transition-colors cursor-pointer"
+            className="px-4 py-2.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-200/80 transition-colors cursor-pointer w-full sm:w-auto"
           >
             Voltar
           </button>
 
-          <button
-            onClick={handleAccept}
-            className="bg-slate-900 hover:bg-sky-600 text-white font-bold text-xs px-6 py-2.5 rounded-lg shadow-md transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Aceitar Contrato & Iniciar Voo</span>
-          </button>
+          {eligibility.isEligible ? (
+            <button
+              onClick={handleAccept}
+              className="bg-slate-900 hover:bg-sky-600 text-white font-bold text-xs px-6 py-2.5 rounded-lg shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Aceitar Contrato & Iniciar Voo</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleGoToCareer}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg shadow transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+            >
+              <Award className="w-4 h-4" />
+              <span>Ver Requisitos de Licença ({eligibility.requiredLicense?.code || 'Ver Carreira'})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>

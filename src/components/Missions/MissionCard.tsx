@@ -1,8 +1,10 @@
 import React from 'react';
 import { Contract } from '../../types';
+import { usePilot } from '../../context/PilotContext';
 import { MissionBadge } from '../UI/Badge';
 import { CompanyLogoBadge } from '../Common/CompanyLogoBadge';
 import { getCountryName } from '../../utils/countryUtils';
+import { checkContractEligibility } from '../../utils/licenseEngine';
 import {
   Coins,
   Navigation,
@@ -10,6 +12,7 @@ import {
   Zap,
   ArrowRight,
   Plane,
+  Lock,
 } from 'lucide-react';
 
 interface MissionCardProps {
@@ -18,6 +21,8 @@ interface MissionCardProps {
 }
 
 export const MissionCard: React.FC<MissionCardProps> = ({ contract, onSelect }) => {
+  const { profile, logbook } = usePilot();
+
   const depCountry = getCountryName(
     contract.route.departureIcao,
     contract.route.departureCity,
@@ -30,18 +35,39 @@ export const MissionCard: React.FC<MissionCardProps> = ({ contract, onSelect }) 
     contract.route.arrivalCountry
   );
 
+  const isInternational = Boolean(
+    contract.ferryDossier ||
+    contract.aircraftCategory?.toLowerCase().includes('internacional') ||
+    contract.title?.toLowerCase().includes('internacional') ||
+    (depCountry && arrCountry && depCountry !== arrCountry)
+  );
+
+  const eligibility = checkContractEligibility(contract, profile, logbook);
+
   return (
     <div
       onClick={() => onSelect(contract)}
-      className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-xl hover:border-sky-300 transition-all duration-300 p-5 flex flex-col justify-between group relative overflow-hidden cursor-pointer"
+      className={`bg-white rounded-2xl border transition-all duration-300 p-5 flex flex-col justify-between group relative overflow-hidden cursor-pointer ${
+        eligibility.isEligible
+          ? 'border-slate-200/90 shadow-xs hover:shadow-xl hover:border-sky-300'
+          : 'border-amber-200/80 bg-gradient-to-b from-white to-amber-50/20 shadow-xs hover:border-amber-400'
+      }`}
     >
       {/* Subtle top hover accent bar */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 via-indigo-500 to-sky-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
       <div className="space-y-4">
-        {/* Top Header: Badge & Distance */}
+        {/* Top Header: Badge, Lock & Distance */}
         <div className="flex items-center justify-between gap-2">
-          <MissionBadge type={contract.type} />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <MissionBadge type={contract.type} isInternational={isInternational} />
+            {!eligibility.isEligible && (
+              <span className="flex items-center gap-1 text-[10px] font-extrabold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300">
+                <Lock className="w-2.5 h-2.5 text-amber-700" />
+                Requer {eligibility.requiredLicense?.code || 'Licença'}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200/80">
             <Navigation className="w-3 h-3 text-sky-500 rotate-45" />
             <span>{contract.route.distanceNm} NM</span>

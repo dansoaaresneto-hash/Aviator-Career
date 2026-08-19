@@ -219,11 +219,11 @@ export const INITIAL_REQUIRED_DOCUMENTS: RequiredDocument[] = [
     id: 'doc_di_import_br',
     regulatoryBodyId: 'body_rfb_br',
     code: 'DI_IMPORT',
-    name: 'Declaração de Importação (DI) & Vistoria do RAB/ANAC',
-    systemName: 'SISCOMEX / Termo de Vistoria Inicial & Liberação Alfandegária',
+    name: 'Declaração de Importação (DI) & Homologação no RAB / CNAV',
+    systemName: 'Receita Federal do Brasil / SISCOMEX & ANAC RAB',
     phase: 'arrival',
-    description: 'Documento oficial de nacionalização, recolhimento de taxas alfandegárias e reserva de novas marcas brasileiras.',
-    requiresReviewDelayMinutes: 2,
+    description: 'Documentação oficial de desembaraço aduaneiro, emissão de CNAV e atribuição do novo prefixo aeronáutico brasileiro.',
+    requiresReviewDelayMinutes: 1,
     formSchema: {
       fields: [
         {
@@ -235,7 +235,7 @@ export const INITIAL_REQUIRED_DOCUMENTS: RequiredDocument[] = [
         },
         {
           key: 'port_of_entry_arrival',
-          label: 'Port of Entry de Desembaraço (ICAO)',
+          label: 'Port of Entry de Desembaraço Aduaneiro (ICAO)',
           type: 'airport_select',
           prefillFrom: 'mission.poe.icao',
           required: true,

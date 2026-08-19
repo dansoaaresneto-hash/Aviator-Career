@@ -1,13 +1,18 @@
 import React from 'react';
 import { MissionType, UrgencyLevel } from '../../types';
-import { Package, Users, Plane, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Package, Users, Plane, Globe, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 
 interface MissionBadgeProps {
   type: MissionType;
+  isInternational?: boolean;
   showIcon?: boolean;
 }
 
-export const MissionBadge: React.FC<MissionBadgeProps> = ({ type, showIcon = true }) => {
+export const MissionBadge: React.FC<MissionBadgeProps> = ({
+  type,
+  isInternational = false,
+  showIcon = true,
+}) => {
   switch (type) {
     case 'cargo':
       return (
@@ -20,14 +25,22 @@ export const MissionBadge: React.FC<MissionBadgeProps> = ({ type, showIcon = tru
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/80">
           {showIcon && <Users className="w-3.5 h-3.5 text-sky-600" />}
-          Passageiros
+          {isInternational ? 'Executivo Internacional' : 'Passageiros'}
         </span>
       );
     case 'ferry':
+      if (isInternational) {
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/80">
+            {showIcon && <Globe className="w-3.5 h-3.5 text-sky-600" />}
+            Translado Internacional
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
           {showIcon && <Plane className="w-3.5 h-3.5 text-emerald-600" />}
-          Translado
+          Translado Nacional
         </span>
       );
     default:

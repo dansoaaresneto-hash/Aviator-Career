@@ -34,6 +34,12 @@ export const Sidebar: React.FC = () => {
       badge: 'Contratos',
     },
     {
+      id: 'career',
+      label: 'Carreira & Licenças',
+      icon: <Award className="w-5 h-5 text-amber-500" />,
+      badge: profile.careerMode === 'free_career' ? 'LIVRE' : (profile.licenseId === 'atpl_master_ferry' ? 'ATPL' : profile.licenseId === 'cpl' ? 'CPL' : profile.licenseId === 'ppl' ? 'PPL' : 'AP'),
+    },
+    {
       id: 'admin-companies',
       label: 'Empresas & Aeronaves',
       icon: <Building2 className="w-5 h-5 text-purple-500" />,
@@ -115,14 +121,24 @@ export const Sidebar: React.FC = () => {
           </div>
 
           <h3 className="font-bold text-slate-800 text-base leading-tight">{profile.name}</h3>
-          <p className="text-xs font-medium text-slate-500 mt-0.5 flex items-center justify-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-sky-500" />
-            {profile.title}
-          </p>
+          <button
+            onClick={() => setActiveTab('career')}
+            className="text-xs font-semibold text-sky-600 hover:text-sky-700 mt-1 flex items-center justify-center gap-1 cursor-pointer group"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-sky-500 group-hover:scale-110 transition-transform" />
+            <span className="group-hover:underline">{profile.title}</span>
+          </button>
 
-          <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-xs font-semibold border border-sky-100">
-            <Award className="w-3.5 h-3.5 text-sky-600" />
-            <span>Nível {profile.level}</span>
+          <div
+            onClick={() => setActiveTab('career')}
+            className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+          >
+            <Award className="w-3.5 h-3.5 text-amber-600" />
+            <span>
+              {profile.careerMode === 'free_career'
+                ? 'Modo Livre'
+                : `Licença: ${profile.licenseId === 'atpl_master_ferry' ? 'ATPL' : profile.licenseId === 'cpl' ? 'CPL' : profile.licenseId === 'ppl' ? 'PPL' : 'AP'}`}
+            </span>
           </div>
         </div>
 

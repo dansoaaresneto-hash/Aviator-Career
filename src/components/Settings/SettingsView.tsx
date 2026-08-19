@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePilot } from '../../context/PilotContext';
-import { Settings, Save, RotateCcw, ShieldAlert, Check } from 'lucide-react';
+import { CareerModeSelectModal } from '../Career/CareerModeSelectModal';
+import { Settings, Save, RotateCcw, ShieldAlert, Check, Award, Compass, RefreshCw } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
   const { profile, updateProfileName, resetCareerData } = usePilot();
@@ -8,6 +9,7 @@ export const SettingsView: React.FC = () => {
   const [callsignInput, setCallsignInput] = useState(profile.preferredCallsign);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [isModeModalOpen, setIsModeModalOpen] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,6 +17,8 @@ export const SettingsView: React.FC = () => {
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
+
+  const isFullCareer = profile.careerMode !== 'free_career';
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -26,6 +30,55 @@ export const SettingsView: React.FC = () => {
         <p className="text-xs text-slate-500 mt-1">
           Ajuste as preferências de piloto, identificadores de chamada e dados do modo carreira
         </p>
+      </div>
+
+      {/* Career Mode Selector Box */}
+      <div className="bg-white rounded-xl p-6 border border-slate-200/90 shadow-sm space-y-4">
+        <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-3 flex items-center justify-between">
+          <span>Modo de Jogo & Progressão</span>
+          <span
+            className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
+              isFullCareer
+                ? 'bg-sky-50 text-sky-700 border-sky-200'
+                : 'bg-purple-50 text-purple-700 border-purple-200'
+            }`}
+          >
+            {isFullCareer ? 'Modo Carreira Completo' : 'Modo Carreira Livre'}
+          </span>
+        </h3>
+
+        <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200/70">
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shrink-0 ${
+              isFullCareer
+                ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
+                : 'bg-purple-600 text-white shadow-sm shadow-purple-500/20'
+            }`}
+          >
+            {isFullCareer ? <Award className="w-5 h-5" /> : <Compass className="w-5 h-5" />}
+          </div>
+          <div className="flex-1">
+            <h4 className="text-xs font-bold text-slate-900">
+              {isFullCareer ? 'Progressão Oficial por Brevês (ANAC/FAA)' : 'Modo Sandbox Livre (Acesso Total)'}
+            </h4>
+            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+              {isFullCareer
+                ? 'Avanço por licenças (Aluno Piloto ➔ PPL ➔ CPL ➔ ATPL). Missões de translado internacional são desbloqueadas após cumprir os requisitos.'
+                : 'Todas as aeronaves, jatos e translados nacionais e internacionais estão 100% desbloqueados.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="pt-1 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => setIsModeModalOpen(true)}
+            className="bg-slate-900 hover:bg-sky-600 text-white font-bold text-xs px-4 py-2.5 rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Alternar Modo de Jogo</span>
+          </button>
+        </div>
       </div>
 
       {/* Pilot Profile Form */}
@@ -82,7 +135,7 @@ export const SettingsView: React.FC = () => {
         </h3>
 
         <p className="text-xs text-slate-600 leading-relaxed">
-          Ao reiniciar sua carreira, seu saldo de Créditos voltará a ser <strong>0 CR</strong>, seu nível retornará ao Nível 1 e o diário de bordo será apagado.
+          Ao reiniciar sua carreira, seu saldo de Créditos voltará a ser <strong>0 CR</strong>, sua licença retornará ao início (Aluno Piloto) e o diário de bordo será apagado.
         </p>
 
         {!showConfirmReset ? (
@@ -116,6 +169,12 @@ export const SettingsView: React.FC = () => {
           </div>
         )}
       </div>
+
+      <CareerModeSelectModal
+        isOpen={isModeModalOpen}
+        onClose={() => setIsModeModalOpen(false)}
+        isInitialSetup={false}
+      />
     </div>
   );
 };
