@@ -245,7 +245,8 @@ CREATE POLICY "Qualquer um pode ler pistas"
 -- View pronta para o gerador de missões e (no futuro) para o cálculo de
 -- paradas de reabastecimento: já traz o comprimento da maior pista e se ela
 -- é pavimentada, e filtra fora heliportos/balloonports/aeroportos fechados.
-CREATE OR REPLACE VIEW public.mission_airports AS
+DROP VIEW IF EXISTS public.mission_airports CASCADE;
+CREATE VIEW public.mission_airports AS
 SELECT
   a.icao,
   a.iata,
@@ -275,3 +276,92 @@ WHERE a.type IN ('small_airport', 'medium_airport', 'large_airport')
   AND a.lng IS NOT NULL;
 
 GRANT SELECT ON public.mission_airports TO anon, authenticated;
+
+-- =========================================================================
+-- 7. TABELA DE EMPRESAS AÉREAS CADASTRADAS (admin_companies)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.admin_companies (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  icao_code TEXT NOT NULL,
+  description TEXT,
+  logo_url TEXT,
+  logo_color TEXT DEFAULT 'from-blue-600 to-sky-500',
+  min_pilot_level INTEGER DEFAULT 1,
+  is_active BOOLEAN DEFAULT TRUE,
+  allowed_mission_types JSONB DEFAULT '[]'::jsonb,
+  route_rules JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.admin_companies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Qualquer um pode ler empresas" ON public.admin_companies;
+CREATE POLICY "Qualquer um pode ler empresas"
+  ON public.admin_companies FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Todos podem inserir empresas" ON public.admin_companies;
+CREATE POLICY "Todos podem inserir empresas"
+  ON public.admin_companies FOR INSERT
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Todos podem atualizar empresas" ON public.admin_companies;
+CREATE POLICY "Todos podem atualizar empresas"
+  ON public.admin_companies FOR UPDATE
+  USING (true);
+
+DROP POLICY IF EXISTS "Todos podem deletar empresas" ON public.admin_companies;
+CREATE POLICY "Todos podem deletar empresas"
+  ON public.admin_companies FOR DELETE
+  USING (true);
+
+-- =========================================================================
+-- 8. TABELA DE CATÁLOGO DE AERONAVES (admin_aircrafts)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.admin_aircrafts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  manufacturer TEXT NOT NULL,
+  icao_code TEXT,
+  category TEXT NOT NULL,
+  max_fuel_gallons NUMERIC(10,2) DEFAULT 0,
+  passenger_capacity INTEGER DEFAULT 0,
+  oew_kg NUMERIC(10,2) DEFAULT 0,
+  mtow_kg NUMERIC(10,2) DEFAULT 0,
+  max_payload_kg NUMERIC(10,2) DEFAULT 0,
+  image_url TEXT,
+  cruising_speed_kts NUMERIC(10,2) DEFAULT 0,
+  range_nm NUMERIC(10,2) DEFAULT 0,
+  cargo_capacity_kg NUMERIC(10,2) DEFAULT 0,
+  rental_fee_per_flight NUMERIC(10,2) DEFAULT 0,
+  purchase_price NUMERIC(10,2) DEFAULT 0,
+  image_placeholder_color TEXT,
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.admin_aircrafts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Qualquer um pode ler aeronaves" ON public.admin_aircrafts;
+CREATE POLICY "Qualquer um pode ler aeronaves"
+  ON public.admin_aircrafts FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Todos podem inserir aeronaves" ON public.admin_aircrafts;
+CREATE POLICY "Todos podem inserir aeronaves"
+  ON public.admin_aircrafts FOR INSERT
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Todos podem atualizar aeronaves" ON public.admin_aircrafts;
+CREATE POLICY "Todos podem atualizar aeronaves"
+  ON public.admin_aircrafts FOR UPDATE
+  USING (true);
+
+DROP POLICY IF EXISTS "Todos podem deletar aeronaves" ON public.admin_aircrafts;
+CREATE POLICY "Todos podem deletar aeronaves"
+  ON public.admin_aircrafts FOR DELETE
+  USING (true);

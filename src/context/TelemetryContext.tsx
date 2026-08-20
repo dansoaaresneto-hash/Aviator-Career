@@ -4,14 +4,12 @@ import { Contract } from '../types';
 
 interface TelemetryContextType {
   telemetry: SimTelemetryData;
-  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'simulated';
+  connectionStatus: 'disconnected' | 'connecting' | 'connected';
   userToken: string;
   showConnectorModal: boolean;
   setShowConnectorModal: (show: boolean) => void;
   regenerateToken: () => void;
   updateTelemetry: (data: Partial<SimTelemetryData>) => void;
-  startVirtualSimulation: (preset?: { airport?: string; aircraft?: string; payloadKg?: number }) => void;
-  stopVirtualSimulation: () => void;
   validateContract: (contract: Contract | null, expectedOriginIcao?: string, currentFlightPhase?: string) => MissionValidationResult;
   isPolling: boolean;
   setIsPolling: (polling: boolean) => void;
@@ -50,7 +48,7 @@ const TelemetryContext = createContext<TelemetryContextType | undefined>(undefin
 export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userToken, setUserToken] = useState<string>(DEFAULT_TOKEN);
   const [showConnectorModal, setShowConnectorModal] = useState<boolean>(false);
-  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'simulated'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [isPolling, setIsPolling] = useState<boolean>(true);
 
   const [telemetry, setTelemetry] = useState<SimTelemetryData>(() => ({
@@ -72,9 +70,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         lastUpdated: new Date().toISOString(),
       };
 
-      if (updated.isSimulated) {
-        setConnectionStatus('simulated');
-      } else if (updated.connected) {
+      if (updated.connected) {
         setConnectionStatus('connected');
       } else {
         setConnectionStatus('disconnected');
@@ -86,7 +82,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Poll server for telemetry pushed by local connector python script
   useEffect(() => {
-    if (!isPolling || connectionStatus === 'simulated') return;
+    if (!isPolling) return;
 
     const interval = setInterval(async () => {
       try {
@@ -113,47 +109,6 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     return () => clearInterval(interval);
   }, [userToken, isPolling, connectionStatus]);
-
-  // Virtual Simulator Preset for testing in-browser
-  const startVirtualSimulation = (preset?: { airport?: string; aircraft?: string; payloadKg?: number }) => {
-    const simData: SimTelemetryData = {
-      token: userToken,
-      connected: true,
-      simName: 'MSFS 2020 (Simulador Virtual)',
-      airportIcao: preset?.airport || 'SBGR',
-      airportName: 'Aeroporto Internacional de Guarulhos',
-      aircraftTitle: preset?.aircraft || 'Cessna 172 Skyhawk G1000',
-      aircraftCategory: 'Monomotor a Pistão',
-      totalWeightKg: 1111,
-      payloadKg: preset?.payloadKg || 380,
-      fuelKg: 140,
-      latitude: -23.4356,
-      longitude: -46.4731,
-      altitudeFt: 2450,
-      groundSpeedKts: 0,
-      onGround: true,
-      lastUpdated: new Date().toISOString(),
-      isSimulated: true,
-    };
-
-    setTelemetry(simData);
-    setConnectionStatus('simulated');
-
-    // Sync to server so pilot appears in live radar
-    fetch('/api/telemetry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(simData),
-    }).catch(() => {});
-  };
-
-  const stopVirtualSimulation = () => {
-    setTelemetry({
-      ...INITIAL_TELEMETRY,
-      token: userToken,
-    });
-    setConnectionStatus('disconnected');
-  };
 
   // Mission validation algorithm
   const validateContract = useCallback(
@@ -392,8 +347,6 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setShowConnectorModal,
         regenerateToken,
         updateTelemetry,
-        startVirtualSimulation,
-        stopVirtualSimulation,
         validateContract,
         isPolling,
         setIsPolling,

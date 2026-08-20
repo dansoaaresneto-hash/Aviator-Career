@@ -18,7 +18,7 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
-  const { signIn, signUp, signInAsDemo, isSupabaseConfigured } = useAuth();
+  const { signIn, signUp, isSupabaseConfigured } = useAuth();
 
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
@@ -54,11 +54,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       }
     }
     setLoading(false);
-  };
-
-  const handleDemoLogin = () => {
-    signInAsDemo('Cmte. Piloto de Testes');
-    if (onSuccess) onSuccess();
   };
 
   return (
@@ -181,18 +176,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           <ArrowRight className="w-4 h-4" />
         </button>
 
-        {/* Quick Demo Login Option */}
+        {/* Switch Login / Register Option */}
         <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={handleDemoLogin}
-            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>Entrar com Conta de Demonstração</span>
-          </button>
-
-          <div className="flex items-center justify-center text-xs pt-2">
+          <div className="flex items-center justify-center text-xs pt-1">
             <button
               type="button"
               onClick={() => {

@@ -196,13 +196,59 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const saved = localStorage.getItem('aviator_admin_companies');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
       } catch (e) {
         console.error(e);
       }
     }
     return INITIAL_ADMIN_COMPANIES;
   });
+
+  // Sync real profile data from Supabase 'profiles' table
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchRealProfile() {
+      if (!user) return;
+      try {
+        let query = supabase.from('profiles').select('*');
+        if (user.id) {
+          query = query.eq('id', user.id);
+        } else if (user.email) {
+          query = query.eq('email', user.email);
+        }
+        const { data: dbProfile, error } = await query.maybeSingle();
+        if (!cancelled && dbProfile) {
+          setProfile((prev) => {
+            const updated: PilotProfile = {
+              ...prev,
+              name: dbProfile.full_name || user.fullName || prev.name,
+              preferredCallsign: dbProfile.callsign || user.callsign || prev.preferredCallsign,
+              title: dbProfile.rank_title || prev.title,
+              credits: dbProfile.credits ?? prev.credits,
+              xp: dbProfile.xp ?? prev.xp,
+              level: dbProfile.level ?? prev.level,
+              totalFlightHours: dbProfile.total_flight_hours ?? prev.totalFlightHours,
+              completedFlights: dbProfile.completed_flights ?? prev.completedFlights,
+              successfulLandings: dbProfile.successful_landings ?? prev.successfulLandings,
+            };
+            localStorage.setItem('aviator_pilot_profile', JSON.stringify(updated));
+            return updated;
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao sincronizar perfil do Supabase:', err);
+      }
+    }
+
+    fetchRealProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.email]);
 
   const [regulatoryZones, setRegulatoryZones] = useState<RegulatoryZone[]>([]);
   const [countriesInfo, setCountriesInfo] = useState<CountryRegulatoryInfo[]>([]);
@@ -353,6 +399,61 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             );
           }
         }
+
+        // 7. Empresas Aéreas Cadastradas (Supabase Sync)
+        try {
+          const { data: compData, error: compErr } = await supabase.from('admin_companies').select('*');
+          if (!cancelled && !compErr && compData) {
+            setAdminCompanies(
+              compData.map((row: any) => ({
+                id: row.id,
+                name: row.name,
+                icaoCode: row.icao_code || row.icaoCode,
+                description: row.description || '',
+                logoUrl: row.logo_url || row.logoUrl,
+                logoColor: row.logo_color || row.logoColor || 'from-blue-600 to-sky-500',
+                minPilotLevel: Number(row.min_pilot_level ?? row.minPilotLevel ?? 1),
+                isActive: Boolean(row.is_active ?? row.isActive ?? true),
+                allowedMissionTypes: typeof row.allowed_mission_types === 'string' ? JSON.parse(row.allowed_mission_types) : (row.allowed_mission_types || row.allowedMissionTypes || []),
+                routeRules: typeof row.route_rules === 'string' ? JSON.parse(row.route_rules) : (row.route_rules || row.routeRules || { scope: 'national', selectedRegions: ['south_america'], originCountries: ['BR'], destinationCountries: ['BR'] }),
+              }))
+            );
+          }
+        } catch (compEx) {
+          console.warn('Tabela admin_companies ainda não criada no Supabase:', compEx);
+        }
+
+        // 8. Frota de Aeronaves (Supabase Sync)
+        try {
+          const { data: airData, error: airErr } = await supabase.from('admin_aircrafts').select('*');
+          if (!cancelled && !airErr && airData && airData.length > 0) {
+            setAdminAircrafts(
+              airData.map((row: any) => ({
+                id: row.id,
+                name: row.name,
+                manufacturer: row.manufacturer,
+                icaoCode: row.icao_code || row.icaoCode || '',
+                category: row.category,
+                maxFuelGallons: Number(row.max_fuel_gallons ?? row.maxFuelGallons ?? 0),
+                passengerCapacity: Number(row.passenger_capacity ?? row.passengerCapacity ?? 0),
+                oewKg: Number(row.oew_kg ?? row.oewKg ?? 0),
+                mtowKg: Number(row.mtow_kg ?? row.mtowKg ?? 0),
+                maxPayloadKg: Number(row.max_payload_kg ?? row.maxPayloadKg ?? 0),
+                imageUrl: row.image_url || row.imageUrl,
+                cruisingSpeedKts: Number(row.cruising_speed_kts ?? row.cruisingSpeedKts ?? 0),
+                rangeNm: Number(row.range_nm ?? row.rangeNm ?? 0),
+                cargoCapacityKg: Number(row.cargo_capacity_kg ?? row.cargoCapacityKg ?? 0),
+                rentalFeePerFlight: Number(row.rental_fee_per_flight ?? row.rentalFeePerFlight ?? 0),
+                purchasePrice: Number(row.purchase_price ?? row.purchasePrice ?? 0),
+                imagePlaceholderColor: row.image_placeholder_color || row.imagePlaceholderColor,
+                description: row.description || '',
+                isActive: Boolean(row.is_active ?? row.isActive ?? true),
+              }))
+            );
+          }
+        } catch (airEx) {
+          console.warn('Tabela admin_aircrafts ainda não criada no Supabase:', airEx);
+        }
       } catch (err) {
         console.error('Erro ao buscar dados regulatórios do Supabase:', err);
       }
@@ -418,15 +519,47 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return [company, ...prev];
     });
+
+    // Supabase Real-time Sync
+    supabase
+      .from('admin_companies')
+      .upsert({
+        id: company.id,
+        name: company.name,
+        icao_code: company.icaoCode,
+        description: company.description,
+        logo_url: company.logoUrl,
+        logo_color: company.logoColor,
+        min_pilot_level: company.minPilotLevel,
+        is_active: company.isActive,
+        allowed_mission_types: company.allowedMissionTypes,
+        route_rules: company.routeRules,
+        updated_at: new Date().toISOString(),
+      })
+      .then();
   };
 
   const deleteCompany = (companyId: string) => {
     setAdminCompanies((prev) => prev.filter((c) => c.id !== companyId));
+
+    // Supabase Real-time Sync
+    supabase.from('admin_companies').delete().eq('id', companyId).then();
   };
 
   const toggleCompanyActive = (companyId: string) => {
     setAdminCompanies((prev) =>
-      prev.map((c) => (c.id === companyId ? { ...c, isActive: !c.isActive } : c))
+      prev.map((c) => {
+        if (c.id === companyId) {
+          const newStatus = !c.isActive;
+          supabase
+            .from('admin_companies')
+            .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+            .eq('id', companyId)
+            .then();
+          return { ...c, isActive: newStatus };
+        }
+        return c;
+      })
     );
   };
 
@@ -468,15 +601,56 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return [aircraft, ...prev];
     });
+
+    // Supabase Real-time Sync
+    supabase
+      .from('admin_aircrafts')
+      .upsert({
+        id: aircraft.id,
+        name: aircraft.name,
+        manufacturer: aircraft.manufacturer,
+        icao_code: aircraft.icaoCode,
+        category: aircraft.category,
+        max_fuel_gallons: aircraft.maxFuelGallons,
+        passenger_capacity: aircraft.passengerCapacity,
+        oew_kg: aircraft.oewKg,
+        mtow_kg: aircraft.mtowKg,
+        max_payload_kg: aircraft.maxPayloadKg,
+        image_url: aircraft.imageUrl,
+        cruising_speed_kts: aircraft.cruisingSpeedKts,
+        range_nm: aircraft.rangeNm,
+        cargo_capacity_kg: aircraft.cargoCapacityKg,
+        rental_fee_per_flight: aircraft.rentalFeePerFlight,
+        purchase_price: aircraft.purchasePrice,
+        image_placeholder_color: aircraft.imagePlaceholderColor,
+        description: aircraft.description,
+        is_active: aircraft.isActive,
+        updated_at: new Date().toISOString(),
+      })
+      .then();
   };
 
   const deleteAircraft = (aircraftId: string) => {
     setAdminAircrafts((prev) => prev.filter((a) => a.id !== aircraftId));
+
+    // Supabase Real-time Sync
+    supabase.from('admin_aircrafts').delete().eq('id', aircraftId).then();
   };
 
   const toggleAircraftActive = (aircraftId: string) => {
     setAdminAircrafts((prev) =>
-      prev.map((a) => (a.id === aircraftId ? { ...a, isActive: a.isActive === false ? true : false } : a))
+      prev.map((a) => {
+        if (a.id === aircraftId) {
+          const newStatus = a.isActive === false ? true : false;
+          supabase
+            .from('admin_aircrafts')
+            .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+            .eq('id', aircraftId)
+            .then();
+          return { ...a, isActive: newStatus };
+        }
+        return a;
+      })
     );
   };
   const [activeContract, setActiveContract] = useState<Contract | null>(() => {
@@ -591,7 +765,7 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (!activeContract) return;
 
-    const isConnected = connectionStatus === 'connected' || connectionStatus === 'simulated' || telemetry.connected;
+    const isConnected = connectionStatus === 'connected' || telemetry.connected;
     if (!isConnected) return;
 
     const speed = Number(telemetry.groundSpeedKts) || 0;
@@ -939,15 +1113,38 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       else if (newLevel >= 3) newTitle = 'Piloto Comercial (CPL)';
       else if (newLevel >= 2) newTitle = 'Piloto Privado (PPL)';
 
+      const updatedCredits = prev.credits + earnedCredits;
+      const updatedHours = +(prev.totalFlightHours + durationHours).toFixed(1);
+      const updatedCompleted = prev.completedFlights + 1;
+      const updatedLandings = prev.successfulLandings + 1;
+
+      // Sync to Supabase in real time if user logged in
+      if (user?.id) {
+        supabase
+          .from('profiles')
+          .update({
+            credits: updatedCredits,
+            xp: newXp,
+            level: newLevel,
+            rank_title: newTitle,
+            total_flight_hours: updatedHours,
+            completed_flights: updatedCompleted,
+            successful_landings: updatedLandings,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id)
+          .then();
+      }
+
       return {
         ...prev,
-        credits: prev.credits + earnedCredits,
+        credits: updatedCredits,
         xp: newXp,
         level: newLevel,
         title: newTitle,
-        totalFlightHours: +(prev.totalFlightHours + durationHours).toFixed(1),
-        completedFlights: prev.completedFlights + 1,
-        successfulLandings: prev.successfulLandings + 1,
+        totalFlightHours: updatedHours,
+        completedFlights: updatedCompleted,
+        successfulLandings: updatedLandings,
       };
     });
 
@@ -987,17 +1184,31 @@ export const PilotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateProfileName = (name: string, callsign: string) => {
-    setProfile((prev) => ({
-      ...prev,
-      name,
-      preferredCallsign: callsign,
-    }));
+    setProfile((prev) => {
+      const updated = {
+        ...prev,
+        name,
+        preferredCallsign: callsign,
+      };
+      if (user?.id) {
+        supabase
+          .from('profiles')
+          .update({
+            full_name: name,
+            callsign: callsign,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id)
+          .then();
+      }
+      return updated;
+    });
   };
 
   const resetCareerData = () => {
     setProfile(INITIAL_PROFILE);
     setAdminCompanies(INITIAL_ADMIN_COMPANIES);
-    setContracts(airportPool.length > 0 ? generateContractsFromCompanies(INITIAL_ADMIN_COMPANIES, airportPool) : []);
+    setContracts([]);
     setActiveContract(null);
     setFlightPhase(null);
     setFlightProgress(0);

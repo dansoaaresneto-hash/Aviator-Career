@@ -25,7 +25,9 @@ import {
   Plane,
   Anchor,
   FileText,
+  Database,
 } from 'lucide-react';
+import { SupabaseSchemaModal } from './SupabaseSchemaModal';
 
 export const AdminCompaniesView: React.FC = () => {
   const {
@@ -52,6 +54,7 @@ export const AdminCompaniesView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<AdminCompany | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSyncingAirports, setIsSyncingAirports] = useState(false);
@@ -272,6 +275,15 @@ export const AdminCompaniesView: React.FC = () => {
 
               <div className="flex flex-wrap items-center gap-3 shrink-0">
                 <button
+                  onClick={() => setIsSupabaseModalOpen(true)}
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                  title="Ver status de conexão e script SQL do Supabase"
+                >
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <span>Banco Supabase</span>
+                </button>
+
+                <button
                   onClick={handleSyncAirports}
                   disabled={isSyncingAirports || airportsLoading}
                   className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
@@ -441,12 +453,17 @@ export const AdminCompaniesView: React.FC = () => {
         </p>
       </div>
 
-      {/* Modal Dialog */}
+      {/* Modal Dialogs */}
       <CompanyModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={saveCompany}
         editingCompany={editingCompany}
+      />
+
+      <SupabaseSchemaModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
       />
         </>
       )}
